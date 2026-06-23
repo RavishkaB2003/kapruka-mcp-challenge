@@ -1507,7 +1507,7 @@ export default function Home() {
               </span>
               <h1 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight tracking-tight text-white drop-shadow-xl">
                 Gifting Joy, <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-terracotta to-amber-500">Delivered Home.</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-yellow-300">Delivered Home.</span>
               </h1>
               <p className="text-base md:text-lg text-white/95 font-light max-w-lg mx-auto leading-relaxed drop-shadow-lg">
                 Send fresh cakes, premium flowers, artisanal chocolates, and grocery baskets to your loved ones in Sri Lanka.
