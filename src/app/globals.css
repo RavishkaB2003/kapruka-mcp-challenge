@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme {
+  --color-slate-black: #16191e;
+  --color-warm-alabaster: #faf8f5;
+  --color-terracotta: #e25c3d;
+  --color-sage-moss: #4d6b53;
+  --color-card-bg: #ffffff;
+  --color-border-warm: #e8e6e0;
+  
+  --shadow-soft: 0 8px 30px rgba(22, 25, 30, 0.03);
+  --shadow-hover: 0 16px 40px rgba(22, 25, 30, 0.06);
+
+  --font-sans: var(--font-inter), var(--font-sinhala), sans-serif;
+  --font-display: var(--font-outfit), var(--font-sinhala), sans-serif;
+}
+
+html,
+body {
+  background-color: var(--color-warm-alabaster);
+  color: var(--color-slate-black);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Safe area insets for notched phones (iPhone X+) */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Custom scrollbar matching Lenis smooth scroll */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-warm-alabaster);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-warm);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-terracotta);
+}
+
+/* Thinner scrollbar on mobile-sized viewports */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    width: 3px;
+  }
+}
+
+/* GPU acceleration hints for scroll-driven animation */
+#main-scroll-container {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+canvas {
+  will-change: contents;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mobile workspace tab toggle styles */
+.mobile-tab-active {
+  position: relative;
+}
+.mobile-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background-color: var(--color-terracotta);
+  border-radius: 1px;
+}
