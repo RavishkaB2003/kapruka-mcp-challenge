@@ -5,6 +5,10 @@ import gsap from 'gsap';
 import createGlobe from 'cobe';
 import { DISTRICTS } from '@/lib/districts';
 
+/**
+ * Preloader component that handles the initial loading animation sequence.
+ * Animates the Sri Lanka district network map and triggers a curtain split transition.
+ */
 interface PreloaderProps {
   onComplete: () => void;
   onReveal?: () => void;
