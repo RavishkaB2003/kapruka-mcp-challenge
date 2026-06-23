@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { KaprukaProduct } from '@/lib/kapruka';
-import CakeCustomizer from './CakeCustomizer';
 import { checkDelivery } from '@/app/actions';
 import { 
   ShoppingBag, Check, Info, ShieldCheck, Heart, 
@@ -36,7 +35,7 @@ interface ProductCustomizerProps {
 export default function ProductCustomizer({ product, city, initialDate, onAdd, onBack }: ProductCustomizerProps) {
   const isCake = product.category?.toLowerCase() === 'cakes' || product.id.toUpperCase().startsWith('CAKE');
   
-  // States for general product
+  // States for product
   const [selectedVariant, setSelectedVariant] = useState<any>(
     product.variants && product.variants.length > 0 ? product.variants[0] : null
   );
@@ -50,8 +49,9 @@ export default function ProductCustomizer({ product, city, initialDate, onAdd, o
     rate: number;
     message: string;
   } | null>(null);
+  const [icingText, setIcingText] = useState('');
 
-  // Sync active image when product changes
+  // Sync active image and variants when product changes
   useEffect(() => {
     setActiveImage(product.image);
     setImageError(false);
@@ -62,9 +62,9 @@ export default function ProductCustomizer({ product, city, initialDate, onAdd, o
     }
   }, [product]);
 
-  // Delivery check for non-cake items
+  // Delivery check for all items
   useEffect(() => {
-    if (isCake || !city || !deliveryDate) return;
+    if (!city || !deliveryDate) return;
     let active = true;
     const verifyDelivery = async () => {
       setIsCheckingDelivery(true);
@@ -85,25 +85,7 @@ export default function ProductCustomizer({ product, city, initialDate, onAdd, o
     };
     verifyDelivery();
     return () => { active = false; };
-  }, [deliveryDate, city, product.id, isCake]);
-
-  if (isCake) {
-    return (
-      <CakeCustomizer
-        product={product}
-        city={city}
-        initialDate={initialDate}
-        onBack={onBack}
-        onAdd={(customDetails) => {
-          onAdd({
-            product,
-            quantity: 1,
-            customization: customDetails
-          });
-        }}
-      />
-    );
-  }
+  }, [deliveryDate, city, product.id]);
 
   const isGrocery = product.category?.toLowerCase() === 'grocery' || 
                     product.category?.toLowerCase() === 'vegetables' || 
@@ -125,7 +107,15 @@ export default function ProductCustomizer({ product, city, initialDate, onAdd, o
     onAdd({
       product: finalProduct,
       quantity,
-      selectedVariantId: selectedVariant?.id
+      selectedVariantId: selectedVariant?.id,
+      customization: {
+        weight: selectedVariant ? selectedVariant.name : (product.weight || '1kg'),
+        flavour: 'Chocolate', // default/fallback
+        icingText: isCake ? icingText.trim() : '',
+        addedPrice: 0,
+        deliveryDate: deliveryDate,
+        deliveryFee: deliveryResult?.rate || 0
+      }
     });
   };
 
@@ -242,10 +232,6 @@ export default function ProductCustomizer({ product, city, initialDate, onAdd, o
                     key={v.id}
                     onClick={() => {
                       setSelectedVariant(v);
-                      if (v.sku) {
-                        // Sometimes variants have different images, if so, switch
-                        // Typically, we can keep the first image or variant specifics
-                      }
                     }}
                     className={`border rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all ${
                       selectedVariant?.id === v.id
@@ -257,6 +243,27 @@ export default function ProductCustomizer({ product, city, initialDate, onAdd, o
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Icing Message for Cakes */}
+          {isCake && (
+            <div className="space-y-2 border-t border-border-warm pt-4">
+              <div className="flex justify-between items-center">
+                <label htmlFor="icingText" className="text-xs font-semibold uppercase tracking-wider text-slate-black/60 block">
+                  Icing Message (Optional)
+                </label>
+                <span className="text-[10px] text-slate-black/40 font-mono">{icingText.length}/120</span>
+              </div>
+              <input
+                id="icingText"
+                type="text"
+                maxLength={120}
+                placeholder="e.g. Happy Birthday Mom! (Written in icing)"
+                value={icingText}
+                onChange={(e) => setIcingText(e.target.value)}
+                className="w-full border border-border-warm rounded-xl px-4 py-2.5 bg-warm-alabaster/90 text-slate-black placeholder-slate-black/35 focus:outline-none focus:border-terracotta transition-colors text-sm"
+              />
             </div>
           )}
 
