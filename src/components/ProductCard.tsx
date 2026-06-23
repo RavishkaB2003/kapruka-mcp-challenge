@@ -8,9 +8,10 @@ import { ShoppingBag, Truck, AlertTriangle, CheckCircle } from 'lucide-react';
 interface ProductCardProps {
   product: KaprukaProduct;
   onSelect: (product: KaprukaProduct) => void;
+  onAddToCart: (product: KaprukaProduct) => void;
 }
 
-export default function ProductCard({ product, onSelect }: ProductCardProps) {
+export default function ProductCard({ product, onSelect, onAddToCart }: ProductCardProps) {
   // Determine if it's a grocery item (to use Sage Moss colorway)
   const isGrocery = product.category?.toLowerCase() === 'grocery' || product.category?.toLowerCase() === 'vegetables' || product.category?.toLowerCase() === 'food';
   
@@ -100,6 +101,10 @@ export default function ProductCard({ product, onSelect }: ProductCardProps) {
         </div>
         
         <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToCart(product);
+          }}
           className={`flex items-center justify-center gap-1.5 rounded-lg px-4 py-3 text-xs font-semibold text-white transition-all duration-300 min-h-[44px] ${
             isGrocery 
               ? 'bg-sage-moss hover:bg-slate-black' 
@@ -107,7 +112,7 @@ export default function ProductCard({ product, onSelect }: ProductCardProps) {
           }`}
         >
           <ShoppingBag className="h-3.5 w-3.5" />
-          Configure
+          Add to Cart
         </button>
       </div>
     </div>

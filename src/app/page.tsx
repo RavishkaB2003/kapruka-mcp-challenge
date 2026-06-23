@@ -1331,6 +1331,37 @@ export default function Home() {
     ]);
   };
 
+  // Add product directly to cart from product card list
+  const handleDirectAddToCart = async (product: KaprukaProduct) => {
+    const city = searchCriteria?.city || 'Colombo';
+    const date = searchCriteria?.date || new Date().toISOString().split('T')[0];
+    
+    let deliveryFee = 350;
+    try {
+      const deliveryInfo = await checkDelivery(city, date, product.id);
+      if (deliveryInfo.deliverable) {
+        deliveryFee = deliveryInfo.rate;
+      }
+    } catch (err) {
+      console.warn('Failed to check direct delivery fee, using fallback:', err);
+    }
+
+    const newItem: CartItem = {
+      product,
+      quantity: 1,
+      customization: {
+        weight: product.weight || '1kg',
+        flavour: product.category === 'cakes' ? 'Chocolate' : 'Standard',
+        icingText: '',
+        addedPrice: 0,
+        deliveryDate: date,
+        deliveryFee
+      }
+    };
+
+    handleAddToCart(newItem);
+  };
+
   // Cart helper functions
   const handleUpdateQuantity = (idx: number, qty: number) => {
     const newCart = [...cart];
@@ -2130,6 +2161,7 @@ export default function Home() {
                                       <ProductCard
                                         product={p}
                                         onSelect={handleProductSelect}
+                                        onAddToCart={handleDirectAddToCart}
                                       />
                                     </motion.div>
                                   ))}
