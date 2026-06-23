@@ -24,3 +24,11 @@ yarn-error.log*
 # Agent temp files
 .agents/scratch/
 .agents/memory/issues/*.tmp
+
+# Restricted Agent and Research Metadata (DO NOT COMMIT)
+.agents/
+AGENTS.md
+DESIGN.md
+research-archive/
+KAPRUKA-NEW-DIRECTION.md
+
