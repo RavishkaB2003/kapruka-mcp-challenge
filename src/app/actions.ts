@@ -209,7 +209,9 @@ Interpret the user message and return a JSON object adhering strictly to the fol
     },
     "occasion": "occasion name if recommend or compose_greeting intent (e.g. Birthday, Anniversary)",
     "tone": "tone for greeting (e.g. romantic, humorous, poetic, formal, warm)",
-    "relationship": "relationship type (e.g. boyfriend, father, mother, friend)"
+    "relationship": "relationship type (e.g. boyfriend, father, mother, friend)",
+    "customMemory": "any specific personal memory, nickname, inside joke, or anecdote mentioned by the user to include in the card (e.g. 'we always ate chocolate cake together', or null if none mentioned)",
+    "recipientName": "the name or nickname of the recipient if mentioned in the query, otherwise null"
   },
   "conversationalReply": "a warm, natural, premium reply stating what you found. Keep it concise. ${isSinhala ? 'Write the conversationalReply in natural, premium Sinhala Unicode.' : 'Write the conversationalReply in English.'}"
 }
@@ -255,7 +257,9 @@ CRITICAL SECURITY GUARDRAILS:
           recipientDetails: parsed.widgetData?.recipientDetails || null,
           occasion: parsed.widgetData?.occasion || null,
           tone: parsed.widgetData?.tone || null,
-          relationship: parsed.widgetData?.relationship || null
+          relationship: parsed.widgetData?.relationship || null,
+          customMemory: parsed.widgetData?.customMemory || null,
+          recipientName: parsed.widgetData?.recipientName || null
         },
         conversationalReply: parsed.conversationalReply || fallback.conversationalReply
       };

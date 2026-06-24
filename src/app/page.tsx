@@ -739,6 +739,9 @@ export default function Home() {
     if (isSinhalaInput && chatLanguage !== 'si') {
       setChatLanguage('si');
       activeLang = 'si';
+    } else if (!isSinhalaInput && chatLanguage === 'si') {
+      setChatLanguage('en');
+      activeLang = 'en';
     }
 
     setMessages(prev => [
@@ -1167,7 +1170,7 @@ export default function Home() {
               const occasion = widgetData?.occasion || 'birthday';
 
               // Extract custom memories and avoid placeholders
-              const memories = extractCustomMemories(userText, relationship, occasion);
+              const memories = widgetData?.customMemory || extractCustomMemories(userText, relationship, occasion);
               const greetings = generateGreetings(relationship, occasion, tone, memories, activeLang === 'si');
 
               widgetsArray.push({

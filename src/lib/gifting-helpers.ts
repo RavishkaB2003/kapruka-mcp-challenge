@@ -245,6 +245,8 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     occasion: string | null;
     tone: string | null;
     relationship: string | null;
+    customMemory: string | null;
+    recipientName: string | null;
   };
   conversationalReply: string;
 } {
@@ -564,7 +566,9 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
       recipientDetails,
       occasion: occasion || (detectedIntent === 'recommend' ? 'Birthday' : null),
       tone: 'warm',
-      relationship
+      relationship,
+      customMemory: extractCustomMemories(query, relationship, occasion),
+      recipientName: relationship ? relationship : null
     },
     conversationalReply
   };
