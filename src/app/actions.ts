@@ -12,6 +12,25 @@ import { localFallbackParse } from "@/lib/gifting-helpers";
 const checkDeliveryLimiter = new InMemoryRateLimiter(60, 60 * 1000);
 const createOrderLimiter = new InMemoryRateLimiter(5, 60 * 1000);
 
+interface MockOrder {
+  orderNumber: string;
+  recipientPhone: string;
+  city: string;
+  items: string;
+  status: string;
+}
+
+const mockOrdersDb = new Map<string, MockOrder>();
+
+// Prefill default MOCK-123
+mockOrdersDb.set('ORD-MOCK-123', {
+  orderNumber: 'ORD-MOCK-123',
+  recipientPhone: '0771234567',
+  city: 'Colombo',
+  items: 'Belgian Chocolate Decadence Fudge Cake',
+  status: 'prepared'
+});
+
 export async function getCategories() {
   try {
     return await kapruka.listCategories();
@@ -84,7 +103,20 @@ export async function createOrder(params: {
       throw new Error('Too many checkout attempts. Please wait a minute before trying again.');
     }
 
-    return await kapruka.createOrder(params);
+    const result = await kapruka.createOrder(params);
+    if (result && result.orderNumber) {
+      const itemsString = params.cart.length > 0 
+        ? params.cart.map(item => item.product_id).join(', ') 
+        : 'Gifting Items';
+      mockOrdersDb.set(result.orderNumber, {
+        orderNumber: result.orderNumber,
+        recipientPhone: params.recipient.phone,
+        city: params.delivery.city,
+        items: itemsString,
+        status: 'prepared'
+      });
+    }
+    return result;
   } catch (error) {
     console.error('Action createOrder error:', error);
     const message = error instanceof Error ? error.message : 'Failed to submit order';
@@ -94,14 +126,42 @@ export async function createOrder(params: {
 
 export async function trackOrder(orderNumber: string, verificationPhone?: string) {
   try {
-    if (process.env.NODE_ENV !== 'production' && orderNumber.startsWith('ORD-MOCK-')) {
-      // Allow mock tracking immediately for testing
+    if (orderNumber.startsWith('ORD-MOCK-')) {
+      const stored = mockOrdersDb.get(orderNumber);
+      
+      if (!verificationPhone) {
+        return {
+          verified: false,
+          status: 'AWAITING_VERIFICATION',
+          message: 'To track your order, please provide the phone number used during checkout to verify your identity.'
+        };
+      }
+      
+      const expectedPhone = stored ? stored.recipientPhone : '0771234567';
+      const expectedCity = stored ? stored.city : 'Colombo';
+      const expectedItems = stored ? stored.items : 'Belgian Chocolate Decadence Fudge Cake';
+      const expectedStatus = stored ? stored.status : 'prepared';
+      
+      const cleanedInputPhone = verificationPhone.replace(/\D/g, '');
+      const cleanedExpectedPhone = expectedPhone.replace(/\D/g, '');
+      
+      const isVerified = cleanedInputPhone.length >= 7 && 
+                         (cleanedExpectedPhone.endsWith(cleanedInputPhone) || cleanedInputPhone.endsWith(cleanedExpectedPhone) || cleanedInputPhone === cleanedExpectedPhone);
+      
+      if (!isVerified) {
+        return {
+          verified: false,
+          status: 'VERIFICATION_FAILED',
+          message: 'Order verification failed. The phone number provided does not match the order records.'
+        };
+      }
+      
       return {
         verified: true,
         orderNumber,
-        status: 'prepared',
-        city: 'Galle',
-        items: 'Belgian Chocolate Decadence Fudge Cake'
+        status: expectedStatus,
+        city: expectedCity,
+        items: expectedItems
       };
     }
 

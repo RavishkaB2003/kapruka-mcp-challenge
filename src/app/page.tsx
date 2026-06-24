@@ -217,6 +217,7 @@ export default function Home() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingOrderNumber, setPendingOrderNumber] = useState<string | null>(null);
+  const [trackingPhoneInputs, setTrackingPhoneInputs] = useState<Record<string, string>>({});
   const [prefilledRecipient, setPrefilledRecipientState] = useState<{
     name?: string | null;
     address?: string | null;
@@ -719,6 +720,64 @@ export default function Home() {
     const rec = searchCriteria?.recipient || 'Someone Special';
 
     await performProductQuery(catValue, cityName, deliveryDate, rec, true);
+  };
+
+  const handleVerifyTracking = async (msgIdx: number, widgetIdx: number, orderNumber: string, phone: string) => {
+    try {
+      const trackInfo = await trackOrder(orderNumber, phone);
+      
+      setMessages(prev => {
+        const next = [...prev];
+        const msg = next[msgIdx];
+        if (msg) {
+          const updatedWidget = {
+            type: 'tracking' as const,
+            data: {
+              orderNumber,
+              status: trackInfo.status,
+              city: trackInfo.city,
+              items: trackInfo.items || 'Gifting Items',
+              verified: trackInfo.verified,
+              message: trackInfo.message
+            }
+          };
+          if (msg.widgets && msg.widgets[widgetIdx]) {
+            msg.widgets[widgetIdx] = updatedWidget;
+          } else if (msg.widget) {
+            msg.widget = updatedWidget;
+          }
+        }
+        return next;
+      });
+      
+      if (trackInfo.verified) {
+        const statusMapEn: Record<string, string> = { ordered: 'Ordered', prepared: 'Prepared/Baking', dispatched: 'Dispatched/Out for Delivery', delivered: 'Delivered' };
+        const statusMapSi: Record<string, string> = { ordered: 'ඇණවුම් කර ඇත', prepared: 'සූදානම් කරමින් පවතී', dispatched: 'බෙදාහැරීමට පිටත්ව ඇත', delivered: 'භාර දී ඇත' };
+        const citySiMap: Record<string, string> = {
+          'Colombo': 'කොළඹ',
+          'Galle': 'ගාල්ල',
+          'Kandy': 'මහනුවර',
+          'Negombo': 'මීගමුව',
+          'Jaffna': 'යාපනය'
+        };
+        const currentStatus = trackInfo.status || 'ordered';
+        const destCity = trackInfo.city || '';
+        const trackMsg = chatLanguage === 'si'
+          ? `ඇණවුම් අංක ${orderNumber} සාර්ථකව සත්‍යාපනය කරන ලදී. වත්මන් තත්ත්වය: ${statusMapSi[currentStatus] || currentStatus} (${citySiMap[destCity] || destCity} වෙත)`
+          : `Order ${orderNumber} verified. Status: ${statusMapEn[currentStatus] || currentStatus} (delivering to ${destCity}).`;
+          
+        setMessages(prev => [
+          ...prev,
+          {
+            sender: 'ai',
+            text: trackMsg,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+      }
+    } catch (err) {
+      console.error('Failed to verify tracking:', err);
+    }
   };
 
   // Conversational text input
@@ -1733,11 +1792,61 @@ export default function Home() {
                             }
 
                             if (widget.type === 'tracking') {
+                              const trackingData = widget.data;
+                              const orderNum = trackingData.orderNumber;
+                              
+                              if (!trackingData.verified) {
+                                return (
+                                  <div key={wIdx} className="mt-3 p-4 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-3 min-w-[260px] md:min-w-[320px]">
+                                    <div className="flex items-center justify-between border-b border-border-warm pb-2">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-xs font-bold font-mono tracking-wider text-slate-black">{orderNum}</span>
+                                      </div>
+                                      <span className="text-[9px] bg-red-50 text-red-700 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider border border-red-100">
+                                        Verification Required
+                                      </span>
+                                    </div>
+                                    <div className="space-y-3">
+                                      <p className="text-[11px] text-slate-black/60 font-light leading-relaxed">
+                                        For security, please enter the {"recipient's"} phone number used during checkout to view delivery status.
+                                      </p>
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="tel"
+                                          placeholder="Recipient Phone (e.g. 0771234567)"
+                                          value={trackingPhoneInputs[orderNum] || ''}
+                                          onChange={(e) => setTrackingPhoneInputs(prev => ({
+                                            ...prev,
+                                            [orderNum]: e.target.value
+                                          }))}
+                                          className="flex-1 border border-border-warm rounded-lg px-3 py-1.5 text-xs bg-warm-alabaster text-slate-black focus:outline-none focus:border-terracotta transition-colors font-mono"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const phone = trackingPhoneInputs[orderNum] || '';
+                                            if (phone.trim()) {
+                                              handleVerifyTracking(idx, wIdx, orderNum, phone);
+                                            }
+                                          }}
+                                          className="bg-slate-black text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider hover:bg-terracotta transition-colors"
+                                        >
+                                          Verify
+                                        </button>
+                                      </div>
+                                      {trackingData.message && (
+                                        <p className="text-[10px] text-red-600 font-medium">{trackingData.message}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div key={wIdx} className="mt-3 p-4 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-4 min-w-[260px] md:min-w-[320px]">
                                   <div className="flex items-center justify-between border-b border-border-warm pb-2">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-xs font-bold font-mono tracking-wider text-slate-black">{widget.data.orderNumber}</span>
+                                      <span className="text-xs font-bold font-mono tracking-wider text-slate-black">{orderNum}</span>
                                     </div>
                                     <span className="text-[9px] bg-slate-black/5 text-slate-black/75 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">
                                       Live Status
@@ -1752,26 +1861,24 @@ export default function Home() {
                                       className="absolute left-6 top-1/2 h-0.5 bg-terracotta -translate-y-1/2 z-0 transition-all duration-1000 ease-out" 
                                       style={{ 
                                         width: `${
-                                          widget.data.status === 'delivered' ? '100%' :
-                                          widget.data.status === 'dispatched' ? '66%' :
-                                          widget.data.status === 'prepared' ? '33%' : '0%'
+                                          trackingData.status === 'delivered' ? '100%' :
+                                          trackingData.status === 'dispatched' ? '66%' :
+                                          trackingData.status === 'prepared' ? '33%' : '0%'
                                         }` 
                                       }}
                                     />
 
                                     {(() => {
-                                      const trackingData = widget.data;
-
                                       return [
                                         { key: 'ordered', label: 'Ordered', icon: '📝' },
                                         { key: 'prepared', label: 'Prepared', icon: '🎂' },
                                         { key: 'dispatched', label: 'Dispatched', icon: '🚚' },
                                         { key: 'delivered', label: 'Delivered', icon: '🎁' }
-                                      ].map((step, idx, arr) => {
+                                      ].map((step, stepIdx, arr) => {
                                         const currentStatus = trackingData.status;
                                         const statusIdx = arr.findIndex(s => s.key === currentStatus);
-                                        const isActive = idx <= statusIdx;
-                                        const isCurrent = idx === statusIdx;
+                                        const isActive = stepIdx <= statusIdx;
+                                        const isCurrent = stepIdx === statusIdx;
 
                                         return (
                                           <div key={step.key} className="relative z-10 flex flex-col items-center">
@@ -1798,11 +1905,11 @@ export default function Home() {
                                   <div className="text-[11px] text-slate-black/60 font-light leading-relaxed border-t border-border-warm pt-3 space-y-1">
                                     <div className="flex justify-between">
                                       <span>Destination:</span>
-                                      <span className="font-semibold text-slate-black">{widget.data.city}</span>
+                                      <span className="font-semibold text-slate-black">{trackingData.city}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span>Items:</span>
-                                      <span className="font-semibold text-slate-black line-clamp-1">{widget.data.items}</span>
+                                      <span className="font-semibold text-slate-black line-clamp-1">{trackingData.items}</span>
                                     </div>
                                   </div>
                                 </div>
