@@ -456,7 +456,7 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     phone: extractedPhone
   } : null;
 
-  const isSinhala = isSinhalaMode || /[\u0D80-\u0DFF]/.test(query) || /\b(thaththa|thaththata|amma|ammata|malli|mallita|nangi|nangita|yaluwa|yaluwata|upandinaya|updandinaya|upandinayata|updandinayata|upadinaya|upadinayata|subha|suba|wachana|wording|one|wewa|wishes|mata|mage|oyata|oyage|keeyada|kiyada|keeyak|kiyak|gana|ganan|ganada|tiyenawada|thiyenawada|tiyeda|thiyeda|puluwanda|puluwada|yawanna|yavanna|denna|nadda|mokakda|mokadda)\b/i.test(query);
+  const isSinhala = isSinhalaMode || /[\u0D80-\u0DFF]/.test(query) || /\b(thaththa|thaththata|amma|ammata|malli|mallita|nangi|nangita|yaluwa|yaluwata|upandinaya|updandinaya|upandinayata|updandinayata|upadinaya|upadinayata|subha|suba|wachana|wewa|onee|oni|onay|mata|mage|oyata|oyage|keeyada|kiyada|keeyak|kiyak|gana|ganan|ganada|tiyenawada|thiyenawada|tiyeda|thiyeda|puluwanda|puluwada|yawanna|yavanna|denna|nadda|mokakda|mokadda)\b/i.test(query) || /\bekak\s+one\b/i.test(query);
 
   // Clarification checks
   let requiresClarification = false;

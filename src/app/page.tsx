@@ -750,31 +750,7 @@ export default function Home() {
         return next;
       });
       
-      if (trackInfo.verified) {
-        const statusMapEn: Record<string, string> = { ordered: 'Ordered', prepared: 'Prepared/Baking', dispatched: 'Dispatched/Out for Delivery', delivered: 'Delivered' };
-        const statusMapSi: Record<string, string> = { ordered: 'ඇණවුම් කර ඇත', prepared: 'සූදානම් කරමින් පවතී', dispatched: 'බෙදාහැරීමට පිටත්ව ඇත', delivered: 'භාර දී ඇත' };
-        const citySiMap: Record<string, string> = {
-          'Colombo': 'කොළඹ',
-          'Galle': 'ගාල්ල',
-          'Kandy': 'මහනුවර',
-          'Negombo': 'මීගමුව',
-          'Jaffna': 'යාපනය'
-        };
-        const currentStatus = trackInfo.status || 'ordered';
-        const destCity = trackInfo.city || '';
-        const trackMsg = chatLanguage === 'si'
-          ? `ඇණවුම් අංක ${orderNumber} සාර්ථකව සත්‍යාපනය කරන ලදී. වත්මන් තත්ත්වය: ${statusMapSi[currentStatus] || currentStatus} (${citySiMap[destCity] || destCity} වෙත)`
-          : `Order ${orderNumber} verified. Status: ${statusMapEn[currentStatus] || currentStatus} (delivering to ${destCity}).`;
-          
-        setMessages(prev => [
-          ...prev,
-          {
-            sender: 'ai',
-            text: trackMsg,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ]);
-      }
+
     } catch (err) {
       console.error('Failed to verify tracking:', err);
     }
@@ -792,7 +768,7 @@ export default function Home() {
     }
 
     // Auto-detect Sinhala or Tanglish
-    const isSinhalaInput = /[\u0D80-\u0DFF]/.test(userText) || /\b(thaththa|thaththata|amma|ammata|malli|mallita|nangi|nangita|yaluwa|yaluwata|upandinaya|updandinaya|upandinayata|updandinayata|upadinaya|upadinayata|subha|suba|wachana|wording|one|wewa|wishes|mata|mage|oyata|oyage|keeyada|kiyada|keeyak|kiyak|gana|ganan|ganada|tiyenawada|thiyenawada|tiyeda|thiyeda|puluwanda|puluwada|yawanna|yavanna|denna|nadda|mokakda|mokadda)\b/i.test(userText);
+    const isSinhalaInput = /[\u0D80-\u0DFF]/.test(userText) || /\b(thaththa|thaththata|amma|ammata|malli|mallita|nangi|nangita|yaluwa|yaluwata|upandinaya|updandinaya|upandinayata|updandinayata|upadinaya|upadinayata|subha|suba|wachana|wewa|onee|oni|onay|mata|mage|oyata|oyage|keeyada|kiyada|keeyak|kiyak|gana|ganan|ganada|tiyenawada|thiyenawada|tiyeda|thiyeda|puluwanda|puluwada|yawanna|yavanna|denna|nadda|mokakda|mokadda)\b/i.test(userText) || /\bekak\s+one\b/i.test(userText);
     
     let activeLang = chatLanguage;
     if (isSinhalaInput && chatLanguage !== 'si') {
@@ -1391,6 +1367,10 @@ export default function Home() {
       }
 
       // 3. Post AI response to chat
+      if (widgetPayload && widgetsArray.indexOf(widgetPayload) === -1) {
+        widgetsArray.push(widgetPayload);
+      }
+
       setMessages(prev => [
         ...prev,
         {
@@ -1906,10 +1886,6 @@ export default function Home() {
                                     <div className="flex justify-between">
                                       <span>Destination:</span>
                                       <span className="font-semibold text-slate-black">{trackingData.city}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Items:</span>
-                                      <span className="font-semibold text-slate-black line-clamp-1">{trackingData.items}</span>
                                     </div>
                                   </div>
                                 </div>
