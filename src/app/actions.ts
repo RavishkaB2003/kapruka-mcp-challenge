@@ -183,6 +183,7 @@ export async function processChatMessage(messageText: string, isSinhala: boolean
 Interpret the user message and return a JSON object adhering strictly to the following schema:
 {
   "detectedIntent": "search" | "check_delivery" | "track_order" | "get_product_info" | "general" | "add_to_cart" | "recommend" | "compose_greeting",
+  "detectedIntents": ["search" | "check_delivery" | "track_order" | "get_product_info" | "general" | "add_to_cart" | "recommend" | "compose_greeting"],
   "detectedCategory": "cakes" | "flowers" | "Chocolates" | "Grocery" | "uniquegifts" | "all",
   "cleanSearchTerm": "a clean English search query (e.g., 'red roses', 'chocolate fudge cake')",
   "requiresClarification": boolean,
@@ -218,6 +219,7 @@ CRITICAL RULES:
 2. DO NOT GUESS / ASK BACK: If the user input is ambiguous, lacks essential parameters, or you are unsure of the category or product they want, set "requiresClarification" to true, and compose a respectable "clarificationPrompt" asking them to clarify in a polite, professional way. Do not guess. ${isSinhala ? 'The clarificationPrompt must be written in natural Sinhala Unicode.' : 'The clarificationPrompt must be in English.'}
 3. RECIPIENT DETAILS EXTRACTION: If the user provides a recipient's name, address, or phone number in their message (e.g., "delivery details: John Doe, 12 Galle Road Colombo, 0771234567"), extract them into the "recipientDetails" object so we can pre-populate the checkout form.
 4. GREETING CARD COMPOSITION CLARIFICATION: If the intent is "compose_greeting", check if the relationship/recipient and the occasion are specified. If either is missing, set "requiresClarification" to true, and dynamically compose "clarificationPrompt" asking ONLY for the missing information (e.g., if recipient is known but occasion is missing, ask for the occasion; if occasion is known but recipient is missing, ask for the recipient; if both are missing, ask for both). If both recipient and occasion are already provided, set "requiresClarification" to false and generate the greetings directly without asking for clarification. You may also politely ask the user for any nicknames, inside jokes, or memories to make it intimate, but do not block if both recipient and occasion are known. ${isSinhala ? 'The clarificationPrompt must be written in natural Sinhala Unicode.' : 'The clarificationPrompt must be in English.'}
+5. MULTI-INTENT DETECTION: The user may ask for multiple things at once (e.g. "Recommend a cake and write a greeting card" or "check delivery rates to Galle and recommend flowers"). Detect all requested intents and list them in the "detectedIntents" array. The primary or first intent should also be set as "detectedIntent". Support this across both English and Sinhala inputs.
 
 CRITICAL SECURITY GUARDRAILS:
 1. Strict Scope Lock: You are strictly a Gifting Concierge. Refuse unrelated topics politely.
@@ -231,6 +233,7 @@ CRITICAL SECURITY GUARDRAILS:
       const parsed = JSON.parse(text);
       return {
         detectedIntent: parsed.detectedIntent || fallback.detectedIntent,
+        detectedIntents: parsed.detectedIntents || [parsed.detectedIntent || fallback.detectedIntent],
         detectedCategory: parsed.detectedCategory || fallback.detectedCategory,
         cleanSearchTerm: parsed.cleanSearchTerm || fallback.cleanSearchTerm,
         requiresClarification: parsed.requiresClarification || false,

@@ -97,6 +97,7 @@ interface Message {
   text: string;
   timestamp: string;
   widget?: WidgetPayload;
+  widgets?: WidgetPayload[];
 }
 
 interface CartItem {
@@ -755,6 +756,7 @@ export default function Home() {
     try {
       let finalReply = '';
       let widgetPayload: WidgetPayload | undefined = undefined;
+      let widgetsArray: WidgetPayload[] = [];
 
       const citySiMap: Record<string, string> = {
         'Colombo': 'කොළඹ',
@@ -942,7 +944,7 @@ export default function Home() {
       } else {
         // 1. Process chat message using Gemini to extract intent & criteria
         const result = await processChatMessage(userText, activeLang === 'si');
-        const { detectedIntent, detectedCategory, cleanSearchTerm, requiresClarification, clarificationPrompt, extractedCriteria, widgetData, conversationalReply } = result;
+        const { detectedIntent, detectedIntents, detectedCategory, cleanSearchTerm, requiresClarification, clarificationPrompt, extractedCriteria, widgetData, conversationalReply } = result;
 
         // Sync active category if found
         if (detectedCategory && detectedCategory !== 'all') {
@@ -988,8 +990,10 @@ export default function Home() {
         });
 
         // Handle Clarification Requests (Do not let AI guess)
+        let accumulatedReply = conversationalReply || '';
+
         if (requiresClarification && clarificationPrompt) {
-          finalReply = clarificationPrompt;
+          accumulatedReply = clarificationPrompt;
           if (detectedIntent === 'recommend') {
             setChatContext({
               type: 'awaiting_recommendation_category',
@@ -1004,261 +1008,310 @@ export default function Home() {
               tone: widgetData?.tone
             });
           }
-        } else if (detectedIntent === 'add_to_cart') {
-          const prodQuery = widgetData.productName || cleanSearchTerm || '';
-          const city = widgetData.city || extractedCriteria.city || 'Colombo';
-          const date = widgetData.date || extractedCriteria.date || new Date().toISOString().split('T')[0];
-          const qty = widgetData.quantity || 1;
+        } else {
+          // Process all detected intents
+          const intentsToProcess = detectedIntents || [detectedIntent];
+          
+          for (const intent of intentsToProcess) {
+            if (intent === 'add_to_cart') {
+              const prodQuery = widgetData?.productName || cleanSearchTerm || '';
+              const city = widgetData?.city || extractedCriteria?.city || 'Colombo';
+              const date = widgetData?.date || extractedCriteria?.date || new Date().toISOString().split('T')[0];
+              const qty = widgetData?.quantity || 1;
 
-          // Query product catalog
-          const searchResults = await searchProducts(prodQuery, 'all', 1);
+              // Query product catalog
+              const searchResults = await searchProducts(prodQuery, 'all', 1);
 
-          if (searchResults && searchResults.length > 0) {
-            const product = searchResults[0];
+              if (searchResults && searchResults.length > 0) {
+                const product = searchResults[0];
 
-            // Run delivery availability check
-            const deliveryInfo = await checkDelivery(city, date, product.id);
+                // Run delivery availability check
+                const deliveryInfo = await checkDelivery(city, date, product.id);
 
-            if (deliveryInfo.deliverable) {
-              // Setup customization and add directly to cart
-              const newItem: CartItem = {
-                product,
-                quantity: qty,
-                customization: {
-                  weight: product.weight || '2.2 lbs (1.0 kg)',
-                  flavour: product.category === 'cakes' ? 'Chocolate Fudge' : 'Standard',
-                  icingText: '',
-                  addedPrice: 0,
-                  deliveryDate: date,
-                  deliveryFee: deliveryInfo.rate
+                if (deliveryInfo.deliverable) {
+                  // Setup customization and add directly to cart
+                  const newItem = {
+                    product,
+                    quantity: qty,
+                    customization: {
+                      weight: product.weight || '2.2 lbs (1.0 kg)',
+                      flavour: product.category === 'cakes' ? 'Chocolate Fudge' : 'Standard',
+                      icingText: '',
+                      addedPrice: 0,
+                      deliveryDate: date,
+                      deliveryFee: deliveryInfo.rate
+                    }
+                  };
+
+                  const newCart = [...cart, newItem];
+                  saveCart(newCart);
+
+                  widgetsArray.push({
+                    type: 'cart_add_success',
+                    data: {
+                      productName: product.name,
+                      image: product.image,
+                      quantity: qty,
+                      city,
+                      date,
+                      price: product.price,
+                      deliveryFee: deliveryInfo.rate,
+                      total: (product.price * qty) + deliveryInfo.rate
+                    }
+                  });
+
+                  const successMsg = activeLang === 'si'
+                    ? `"${product.name}" (ප්‍රමාණය: ${qty}) සාර්ථකව ඔබගේ කාර්ට් එකට එකතු කරන ලදී, බෙදා හැරීම ${citySiMap[city] || city} වෙත ${date} දින සිදු කෙරේ.`
+                    : `I've successfully added "${product.name}" (Qty: ${qty}) to your cart, set for delivery to ${city} on ${date}.`;
+
+                  // Ask for missing recipient details if they are not already filled
+                  const hasName = prefilledRecipient?.name || widgetData?.recipientDetails?.name;
+                  const hasAddress = prefilledRecipient?.address || widgetData?.recipientDetails?.address;
+                  const hasPhone = prefilledRecipient?.phone || widgetData?.recipientDetails?.phone;
+
+                  let detailPrompt = '';
+                  if (!hasName || !hasAddress || !hasPhone) {
+                    const missingList = [];
+                    if (!hasName) missingList.push(activeLang === 'si' ? "ලබන්නාගේ නම" : "recipient's name");
+                    if (!hasAddress) missingList.push(activeLang === 'si' ? "බෙදා හැරීමේ ලිපිනය" : "delivery address");
+                    if (!hasPhone) missingList.push(activeLang === 'si' ? "දුරකථන අංකය" : "contact phone number");
+                    
+                    detailPrompt = activeLang === 'si'
+                      ? `\n\nබෙදා හැරීම සම්පූර්ණ කිරීම සඳහා කරුණාකර මට ${missingList.join(', ')} පවසන්න.`
+                      : `\n\nTo complete delivery setup, could you please tell me the ${missingList.join(', ')}?`;
+                    setChatContext({
+                      type: 'awaiting_delivery_details'
+                    });
+                  } else {
+                    detailPrompt = activeLang === 'si'
+                      ? `\n\nමම මෙම බෙදා හැරීමේ තොරතුරු පහත ඇණවුම් පෝරමයේ ඇතුලත් කර ඇත. ඔබට ඕනෑම වේලාවක එය පරීක්ෂා කළ හැක!`
+                      : `\n\nI have prefilled these delivery details in your order form below. You can review them anytime!`;
+                  }
+                  
+                  if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                    accumulatedReply = successMsg + detailPrompt;
+                  } else {
+                    accumulatedReply += '\n\n' + successMsg + detailPrompt;
+                  }
+                } else {
+                  const errMessage = activeLang === 'si'
+                    ? `"${product.name}" සොයා ගන්නා ලදී නමුත් ${citySiMap[city] || city} වෙත ${date} දින බෙදා හැරීම සිදු කළ නොහැක. (හේතුව: ${deliveryInfo.message})`
+                    : `I found "${product.name}" but delivery is not available to ${city} on ${date}. Reason: ${deliveryInfo.message}`;
+                  
+                  if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                    accumulatedReply = errMessage;
+                  } else {
+                    accumulatedReply += '\n\n' + errMessage;
+                  }
                 }
-              };
+              } else {
+                const notFoundMsg = activeLang === 'si'
+                  ? `"${prodQuery}" සඳහා ගැළපෙන නිෂ්පාදනයක් සෙවිය නොහැක. කරුණාකර ඔබ කැමති කේක්, මල් බූකේ, හෝ චොකලට් වර්ගය කුමක්දැයි පැහැදිලි කරන්න.`
+                  : `I couldn't find a product matching "${prodQuery}" to add to your cart. Could you please specify which exact cake, chocolate, or flowers you would like to select?`;
+                
+                if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                  accumulatedReply = notFoundMsg;
+                } else {
+                  accumulatedReply += '\n\n' + notFoundMsg;
+                }
+              }
 
-              const newCart = [...cart, newItem];
-              saveCart(newCart);
+            } else if (intent === 'recommend') {
+              const queryCat = detectedCategory === 'all' ? 'cakes' : detectedCategory;
+              const searchResults = await searchProducts(cleanSearchTerm || 'gift', queryCat, 3);
 
-              widgetPayload = {
-                type: 'cart_add_success',
+              if (searchResults && searchResults.length > 0) {
+                setProducts(searchResults);
+                setMobileActiveTab('shop');
+                widgetsArray.push({
+                  type: 'recommendations',
+                  data: {
+                    occasion: widgetData?.occasion || 'Special Celebration',
+                    products: searchResults.map(p => ({
+                      id: p.id,
+                      name: p.name,
+                      price: p.price,
+                      image: p.image,
+                      stock: p.stock,
+                      weight: p.weight || '2.2 lbs (1.0 kg)',
+                      category: p.category,
+                      url: p.url
+                    }))
+                  }
+                });
+                const relDisplay = widgetData?.relationship ? (recipientSiMap[widgetData.relationship] || widgetData.relationship) : 'විශේෂ කෙනෙකු';
+                const recMsg = activeLang === 'si'
+                  ? `ඔබගේ ${relDisplay} සඳහා වන නිර්දේශ කිහිපයක් මෙන්න. විස්තර පහතින් බලාගත හැක:`
+                  : `Based on your request for a ${widgetData?.relationship || 'special'} gift, I recommend these options. You can review and select them directly below:`;
+                
+                if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                  accumulatedReply = recMsg;
+                } else {
+                  accumulatedReply += '\n\n' + recMsg;
+                }
+              } else {
+                const noRecMsg = activeLang === 'si'
+                  ? `"${cleanSearchTerm}" සඳහා නිර්දේශ කිහිපයක් සෙවිය නොහැක. කරුණාකර කේක්, මල් බූකේ, හෝ චොකලට් වලින් කුමක් තෝරන්නේදැයි පවසන්න.`
+                  : `I couldn't find any specific catalog recommendations for "${cleanSearchTerm}". Could you please clarify if you prefer Cakes, Flowers, or Chocolates?`;
+                
+                if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                  accumulatedReply = noRecMsg;
+                } else {
+                  accumulatedReply += '\n\n' + noRecMsg;
+                }
+              }
+
+            } else if (intent === 'compose_greeting') {
+              const tone = widgetData?.tone || 'warm';
+              const relationship = widgetData?.relationship || 'friend';
+              const occasion = widgetData?.occasion || 'birthday';
+
+              // Extract custom memories and avoid placeholders
+              const memories = extractCustomMemories(userText, relationship, occasion);
+              const greetings = generateGreetings(relationship, occasion, tone, memories, activeLang === 'si');
+
+              widgetsArray.push({
+                type: 'compose_greeting',
                 data: {
-                  productName: product.name,
-                  image: product.image,
-                  quantity: qty,
+                  relationship,
+                  occasion,
+                  tone,
+                  options: greetings
+                }
+              });
+              const greetingMsg = activeLang === 'si'
+                ? `ඔබගේ ${relationship === 'father' ? 'තාත්තා' : relationship === 'mother' ? 'අම්මා' : relationship} ගේ ${occasion === 'birthday' ? 'උපන්දිනය' : 'විශේෂ දිනය'} වෙනුවෙන් මා සකස් කල සුබපැතුම් 3 මෙන්න. එය ඇතුලත් කිරීමට "Apply" ක්ලික් කරන්න!`
+                : `Here are 3 custom greeting note options I've written for your ${relationship}'s ${occasion}. Click "Apply" to copy it directly to your gift note!`;
+
+              if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                accumulatedReply = greetingMsg;
+              } else {
+                accumulatedReply += '\n\n' + greetingMsg;
+              }
+
+            } else if (intent === 'check_delivery') {
+              const city = widgetData?.city || extractedCriteria?.city || 'Colombo';
+              const date = widgetData?.date || extractedCriteria?.date || new Date().toISOString().split('T')[0];
+              const deliveryInfo = await checkDelivery(city, date);
+
+              widgetsArray.push({
+                type: 'delivery',
+                data: {
                   city,
                   date,
-                  price: product.price,
-                  deliveryFee: deliveryInfo.rate,
-                  total: (product.price * qty) + deliveryInfo.rate
+                  deliverable: deliveryInfo.deliverable,
+                  rate: deliveryInfo.rate,
+                  message: deliveryInfo.message
                 }
-              };
-
-              finalReply = activeLang === 'si'
-                ? `"${product.name}" (ප්‍රමාණය: ${qty}) සාර්ථකව ඔබගේ කාර්ට් එකට එකතු කරන ලදී, බෙදා හැරීම ${citySiMap[city] || city} වෙත ${date} දින සිදු කෙරේ.`
-                : `I've successfully added "${product.name}" (Qty: ${qty}) to your cart, set for delivery to ${city} on ${date}.`;
-
-              // Ask for missing recipient details if they are not already filled
-              const hasName = prefilledRecipient?.name || widgetData.recipientDetails?.name;
-              const hasAddress = prefilledRecipient?.address || widgetData.recipientDetails?.address;
-              const hasPhone = prefilledRecipient?.phone || widgetData.recipientDetails?.phone;
-
-              if (!hasName || !hasAddress || !hasPhone) {
-                const missingList = [];
-                if (!hasName) missingList.push(activeLang === 'si' ? "ලබන්නාගේ නම" : "recipient's name");
-                if (!hasAddress) missingList.push(activeLang === 'si' ? "බෙදා හැරීමේ ලිපිනය" : "delivery address");
-                if (!hasPhone) missingList.push(activeLang === 'si' ? "දුරකථන අංකය" : "contact phone number");
-                
-                finalReply += activeLang === 'si'
-                  ? `\n\nබෙදා හැරීම සම්පූර්ණ කිරීම සඳහා කරුණාකර මට ${missingList.join(', ')} පවසන්න.`
-                  : `\n\nTo complete delivery setup, could you please tell me the ${missingList.join(', ')}?`;
-                setChatContext({
-                  type: 'awaiting_delivery_details'
-                });
+              });
+              const deliveryMsg = deliveryInfo.deliverable
+                ? (activeLang === 'si'
+                  ? `${citySiMap[city] || city} වෙත ${date} දින බෙදා හැරීම සිදු කළ හැක. බෙදා හැරීමේ ගාස්තුව: LKR ${deliveryInfo.rate.toLocaleString()}`
+                  : `Delivery is available to ${city} on ${date}. Delivery fee is LKR ${deliveryInfo.rate.toLocaleString()}`)
+                : (activeLang === 'si'
+                  ? `${citySiMap[city] || city} වෙත ${date} දින බෙදා හැරීම සිදු කළ නොහැක. (හේතුව: ${deliveryInfo.message})`
+                  : `Delivery is not available to ${city} on ${date}. Reason: ${deliveryInfo.message}`);
+              
+              if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                accumulatedReply = deliveryMsg;
               } else {
-                finalReply += activeLang === 'si'
-                  ? `\n\nමම මෙම බෙදා හැරීමේ තොරතුරු පහත ඇණවුම් පෝරමයේ ඇතුලත් කර ඇත. ඔබට ඕනෑම වේලාවක එය පරීක්ෂා කළ හැක!`
-                  : `\n\nI have prefilled these delivery details in your order form below. You can review them anytime!`;
+                accumulatedReply += '\n\n' + deliveryMsg;
               }
-            } else {
-              finalReply = activeLang === 'si'
-                ? `"${product.name}" සොයා ගන්නා ලදී නමුත් ${citySiMap[city] || city} වෙත ${date} දින බෙදා හැරීම සිදු කළ නොහැක. (හේතුව: ${deliveryInfo.message})`
-                : `I found "${product.name}" but delivery is not available to ${city} on ${date}. Reason: ${deliveryInfo.message}`;
-            }
-          } else {
-            // Politely ask for clarification instead of guessing
-            finalReply = activeLang === 'si'
-              ? `"${prodQuery}" සඳහා ගැළපෙන නිෂ්පාදනයක් සෙවිය නොහැක. කරුණාකර ඔබ කැමති කේක්, මල් බූකේ, හෝ චොකලට් වර්ගය කුමක්දැයි පැහැදිලි කරන්න.`
-              : `I couldn't find a product matching "${prodQuery}" to add to your cart. Could you please specify which exact cake, chocolate, or flowers you would like to select?`;
-          }
 
-        } else if (detectedIntent === 'recommend') {
-          const queryCat = detectedCategory === 'all' ? 'cakes' : detectedCategory;
-          const searchResults = await searchProducts(cleanSearchTerm || 'gift', queryCat, 3);
+            } else if (intent === 'track_order') {
+              const orderNumber = widgetData?.orderNumber || '';
+              const verificationPhone = widgetData?.verificationPhone || '';
 
-          if (searchResults && searchResults.length > 0) {
-            setProducts(searchResults);
-            setMobileActiveTab('shop');
-            widgetPayload = {
-              type: 'recommendations',
-              data: {
-                occasion: widgetData.occasion || 'Special Celebration',
-                products: searchResults.map(p => ({
-                  id: p.id,
-                  name: p.name,
-                  price: p.price,
-                  image: p.image,
-                  stock: p.stock,
-                  weight: p.weight || '2.2 lbs (1.0 kg)',
-                  category: p.category,
-                  url: p.url
-                }))
-              }
-            };
-            const relDisplay = widgetData.relationship ? (recipientSiMap[widgetData.relationship] || widgetData.relationship) : 'විශේෂ කෙනෙකු';
-            finalReply = activeLang === 'si'
-              ? `ඔබගේ ${relDisplay} සඳහා වන නිර්දේශ කිහිපයක් මෙන්න. විස්තර පහතින් බලාගත හැක:`
-              : `Based on your request for a ${widgetData.relationship || 'special'} gift, I recommend these options. You can review and select them directly below:`;
-          } else {
-            finalReply = activeLang === 'si'
-              ? `"${cleanSearchTerm}" සඳහා නිර්දේශ කිහිපයක් සෙවිය නොහැක. කරුණාකර කේක්, මල් බූකේ, හෝ චොකලට් වලින් කුමක් තෝරන්නේදැයි පවසන්න.`
-              : `I couldn't find any specific catalog recommendations for "${cleanSearchTerm}". Could you please clarify if you prefer Cakes, Flowers, or Chocolates?`;
-          }
-
-        } else if (detectedIntent === 'compose_greeting') {
-          const tone = widgetData.tone || 'warm';
-          const relationship = widgetData.relationship || 'friend';
-          const occasion = widgetData.occasion || 'birthday';
-
-          // Extract custom memories and avoid placeholders
-          const memories = extractCustomMemories(userText, relationship, occasion);
-
-          const greetings = generateGreetings(relationship, occasion, tone, memories, activeLang === 'si');
-
-          widgetPayload = {
-            type: 'compose_greeting',
-            data: {
-              relationship,
-              occasion,
-              tone,
-              options: greetings
-            }
-          };
-          finalReply = activeLang === 'si'
-            ? `ඔබගේ ${relationship === 'father' ? 'තාත්තා' : relationship === 'mother' ? 'අම්මා' : relationship} ගේ ${occasion === 'birthday' ? 'උපන්දිනය' : 'විශේෂ දිනය'} වෙනුවෙන් මා සකස් කල සුබපැතුම් 3 මෙන්න. එය ඇතුලත් කිරීමට "Apply" ක්ලික් කරන්න!`
-            : `Here are 3 custom greeting note options I've written for your ${relationship}'s ${occasion}. Click "Apply" to copy it directly to your gift note!`;
-
-        } else if (detectedIntent === 'check_delivery') {
-          const city = widgetData.city || extractedCriteria.city || 'Colombo';
-          const date = widgetData.date || extractedCriteria.date || new Date().toISOString().split('T')[0];
-          
-          // Execute server action
-          const deliveryInfo = await checkDelivery(city, date);
-          
-          widgetPayload = {
-            type: 'delivery',
-            data: {
-              city,
-              date,
-              deliverable: deliveryInfo.deliverable,
-              rate: deliveryInfo.rate,
-              message: deliveryInfo.message
-            }
-          };
-          finalReply = deliveryInfo.deliverable
-            ? (activeLang === 'si'
-                ? `සුභ ආරංචියක්! අපට ${citySiMap[city] || city} වෙත ${date} දින බෙදා හැරිය හැක. බෙදා හැරීමේ ගාස්තුව: LKR ${deliveryInfo.rate.toLocaleString()}.`
-                : `Good news! We can deliver to ${city} on ${date}. The shipping rate is LKR ${deliveryInfo.rate.toLocaleString()}.`)
-            : (activeLang === 'si'
-                ? `කණගාටුයි, එම දිනයේදී ${citySiMap[city] || city} වෙත බෙදා හැරීම් සිදු කළ නොහැක. (හේතුව: ${deliveryInfo.message})`
-                : `I am sorry, but delivery to ${city} is currently unavailable for that date. ${deliveryInfo.message}`);
-
-        } else if (detectedIntent === 'track_order') {
-          const orderNum = widgetData.orderNumber || pendingOrderNumber;
-          const phone = widgetData.verificationPhone;
-
-          if (!orderNum) {
-            finalReply = `To track your order, please provide your order reference number (e.g. ORD-MOCK-123 or ORD-12345).`;
-          } else {
-            // We have an order number! Let's check status
-            const trackResult = await trackOrder(orderNum, phone || undefined);
-            
-            if (!trackResult.verified) {
-              setPendingOrderNumber(orderNum);
-              finalReply = trackResult.message || `To track order ${orderNum}, please provide the phone number used at checkout for verification.`;
-            } else {
-              // Verified successfully!
-              setPendingOrderNumber(null);
-              widgetPayload = {
+              const trackInfo = await trackOrder(orderNumber, verificationPhone);
+              widgetsArray.push({
                 type: 'tracking',
                 data: {
-                  orderNumber: orderNum,
-                  status: trackResult.status,
-                  city: trackResult.city || 'Colombo',
-                  items: trackResult.items || 'Gifting Items',
-                  verified: true
+                  orderNumber,
+                  status: trackInfo.status,
+                  city: trackInfo.city,
+                  items: trackInfo.items || 'Gifting Items',
+                  verified: trackInfo.verified,
+                  message: trackInfo.message
                 }
-              };
-              
-              const statusMap: Record<string, string> = {
-                'ordered': 'is received and waiting for payment verification',
-                'prepared': 'is currently being prepared and hand-crafted',
-                'dispatched': 'has been dispatched and is out for delivery',
-                'delivered': 'has been successfully delivered! 🎉'
-              };
-              
-              const statusMapSi: Record<string, string> = {
-                'ordered': 'ඇණවුම ලැබී ඇති අතර ගෙවීම් තහවුරු වන තෙක් බලා සිටී',
-                'prepared': 'මේ වන විට සූදානම් කරමින් පවතී',
-                'dispatched': 'බෙදා හැරීම සඳහා පිටත්ව ගොස් ඇත',
-                'delivered': 'සාර්ථකව බෙදා හැර ඇත! 🎉'
-              };
-              
-              finalReply = activeLang === 'si'
-                ? `ඇණවුම් අංක ${orderNum} ${statusMapSi[trackResult.status] || 'සකසමින් පවතී'}. එය ${citySiMap[trackResult.city || 'Colombo'] || trackResult.city} වෙත බෙදා හැරේ.`
-                : `Order ${orderNum} ${statusMap[trackResult.status] || 'is being processed'}. We are delivering it to ${trackResult.city || 'Colombo'}.`;
-            }
-          }
-        } else if (detectedIntent === 'get_product_info') {
-          const productQuery = widgetData.productQuery || cleanSearchTerm || '';
-          let matchedProduct = selectedProduct;
+              });
 
-          // If no selected product or the query has a specific name, search the catalog
-          if (!matchedProduct || (productQuery && productQuery.trim().length > 0)) {
-            const searchResults = await searchProducts(productQuery, 'all', 1);
-            if (searchResults && searchResults.length > 0) {
-              matchedProduct = searchResults[0];
-            }
-          }
-
-          if (matchedProduct) {
-            const ingredients = getIngredientsForProduct(matchedProduct.name, matchedProduct.category);
-            const allergens = getAllergensForProduct(matchedProduct.name, matchedProduct.category);
-            
-            widgetPayload = {
-              type: 'product_info',
-              data: {
-                id: matchedProduct.id,
-                name: matchedProduct.name,
-                price: matchedProduct.price,
-                image: matchedProduct.image,
-                stock: matchedProduct.stock,
-                weight: matchedProduct.weight || '2.2 lbs (1.0 kg)',
-                description: matchedProduct.description || 'A premium selection from Kapruka Gifting.',
-                ingredients,
-                allergens
+              let trackMsg = '';
+              if (trackInfo.verified) {
+                const statusMapEn: Record<string, string> = { ordered: 'Ordered', prepared: 'Prepared/Baking', dispatched: 'Dispatched/Out for Delivery', delivered: 'Delivered' };
+                const statusMapSi: Record<string, string> = { ordered: 'ඇණවුම් කර ඇත', prepared: 'සූදානම් කරමින් පවතී', dispatched: 'බෙදාහැරීමට පිටත්ව ඇත', delivered: 'භාර දී ඇත' };
+                
+                const currentStatus = trackInfo.status || 'ordered';
+                const destCity = trackInfo.city || '';
+                trackMsg = activeLang === 'si'
+                  ? `ඇණවුම් අංක ${orderNumber} සාර්ථකව සොයා ගන්නා ලදී. වත්මන් තත්ත්වය: ${statusMapSi[currentStatus] || currentStatus} (${citySiMap[destCity] || destCity} වෙත)`
+                  : `Order ${orderNumber} status retrieved: ${statusMapEn[currentStatus] || currentStatus} (delivering to ${destCity}).`;
+              } else {
+                trackMsg = trackInfo.message || 'Verification failed.';
               }
-            };
-            finalReply = `Here are the product specifications and ingredients for "${matchedProduct.name}".`;
-          } else {
-            finalReply = `I couldn't find details for a product matching "${productQuery}". Let me know if you would like me to search for another gift.`;
-          }
-        } else {
-          // Fallback or search intent
-          const queryCat = detectedCategory === 'all' ? 'cakes' : detectedCategory;
-          const results = await searchProducts(cleanSearchTerm, queryCat, 6);
-          setProducts(results);
-          if (results && results.length > 0) {
-            setMobileActiveTab('shop');
+
+              if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                accumulatedReply = trackMsg;
+              } else {
+                accumulatedReply += '\n\n' + trackMsg;
+              }
+
+            } else if (intent === 'get_product_info') {
+              const productQuery = widgetData?.productQuery || cleanSearchTerm || '';
+              const searchResults = await searchProducts(productQuery, 'all', 1);
+
+              if (searchResults && searchResults.length > 0) {
+                const matchedProduct = searchResults[0];
+                const ingredients = getIngredientsForProduct(matchedProduct.name, matchedProduct.category || 'cakes');
+                const allergens = getAllergensForProduct(matchedProduct.name, matchedProduct.category || 'cakes');
+
+                widgetsArray.push({
+                  type: 'product_info',
+                  data: {
+                    id: matchedProduct.id,
+                    name: matchedProduct.name,
+                    price: matchedProduct.price,
+                    image: matchedProduct.image,
+                    stock: matchedProduct.stock,
+                    description: matchedProduct.description || 'A premium selection from Kapruka Gifting.',
+                    weight: matchedProduct.weight || '2.2 lbs (1.0 kg)',
+                    ingredients,
+                    allergens
+                  }
+                });
+
+                const infoMsg = activeLang === 'si'
+                  ? `"${matchedProduct.name}" සඳහා භාණ්ඩයේ විස්තර සහ අඩංගු ද්‍රව්‍ය සූදානම් කර ඇත.`
+                  : `Here are the product specifications and ingredients for "${matchedProduct.name}".`;
+
+                if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                  accumulatedReply = infoMsg;
+                } else {
+                  accumulatedReply += '\n\n' + infoMsg;
+                }
+              } else {
+                const notFoundInfoMsg = activeLang === 'si'
+                  ? `"${productQuery}" සඳහා විස්තර සෙවිය නොහැක. වෙනත් භාණ්ඩයක් සඳහා විමසන්න.`
+                  : `I couldn't find details for a product matching "${productQuery}". Let me know if you would like me to search for another gift.`;
+
+                if (accumulatedReply === conversationalReply || !accumulatedReply) {
+                  accumulatedReply = notFoundInfoMsg;
+                } else {
+                  accumulatedReply += '\n\n' + notFoundInfoMsg;
+                }
+              }
+            } else {
+              // Fallback or search intent
+              const queryCat = detectedCategory === 'all' ? 'cakes' : detectedCategory;
+              const results = await searchProducts(cleanSearchTerm, queryCat, 6);
+              setProducts(results);
+              if (results && results.length > 0) {
+                setMobileActiveTab('shop');
+              }
+            }
           }
         }
+
+        finalReply = accumulatedReply;
       }
 
       // 3. Post AI response to chat
@@ -1268,7 +1321,7 @@ export default function Home() {
           sender: 'ai',
           text: finalReply,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          widget: widgetPayload
+          widgets: widgetsArray
         }
       ]);
     } catch (err) {
@@ -1588,7 +1641,7 @@ export default function Home() {
                       }}
                       className={`rounded-full border px-4 py-1 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${chatLanguage === 'si' ? 'bg-terracotta border-terracotta text-white font-bold' : 'border-border-warm bg-warm-alabaster text-slate-black/60 hover:text-terracotta'}`}
                     >
-                      {chatLanguage === 'si' ? 'English' : 'සිංහල'}
+                      {chatLanguage === 'si' ? 'සිංහල 🇱🇰' : 'English 🇺🇸'}
                     </button>
                     <button 
                       type="button"
@@ -1622,311 +1675,330 @@ export default function Home() {
                       >
                         <p className="text-base font-light leading-relaxed whitespace-pre-wrap">{m.text}</p>
                         
-                        {m.widget && m.widget.type === 'delivery' && (
-                          <div className="mt-3 p-4 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-terracotta shrink-0" />
-                                <span className="text-sm font-bold tracking-wide uppercase">{m.widget.data.city}</span>
-                              </div>
-                              <span className={`text-[10px] px-2 py-1 rounded-full font-semibold uppercase tracking-wider ${
-                                m.widget.data.deliverable 
-                                  ? 'bg-green-50 text-green-700 border border-green-200' 
-                                  : 'bg-red-50 text-red-700 border border-red-200'
-                              }`}>
-                                {m.widget.data.deliverable ? 'Deliverable' : 'Unavailable'}
-                              </span>
-                            </div>
-                            
-                            <div className="text-xs space-y-1">
-                              <div className="flex justify-between">
-                                <span className="text-slate-black/55 font-light">Delivery Date:</span>
-                                <span className="font-semibold">{m.widget.data.date}</span>
-                              </div>
-                              {m.widget.data.deliverable && (
-                                <div className="flex justify-between">
-                                  <span className="text-slate-black/55 font-light">Shipping Fee:</span>
-                                  <span className="font-bold text-terracotta">LKR {m.widget.data.rate.toLocaleString()}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            <p className="text-[11px] text-slate-black/60 font-light italic leading-snug border-t border-border-warm pt-2">
-                              {m.widget.data.message}
-                            </p>
-                          </div>
-                        )}
-
-                        {m.widget && m.widget.type === 'tracking' && (
-                          <div className="mt-3 p-4 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-4 min-w-[260px] md:min-w-[320px]">
-                            <div className="flex items-center justify-between border-b border-border-warm pb-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold font-mono tracking-wider text-slate-black">{m.widget.data.orderNumber}</span>
-                              </div>
-                              <span className="text-[9px] bg-slate-black/5 text-slate-black/75 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">
-                                Live Status
-                              </span>
-                            </div>
-
-                            {/* Progress Timeline */}
-                            <div className="relative flex justify-between items-center px-1 py-4">
-                              {/* Connection lines */}
-                              <div className="absolute left-6 right-6 top-1/2 h-0.5 bg-border-warm -translate-y-1/2 z-0" />
-                              <div 
-                                className="absolute left-6 top-1/2 h-0.5 bg-terracotta -translate-y-1/2 z-0 transition-all duration-1000 ease-out" 
-                                style={{ 
-                                  width: `${
-                                    m.widget.data.status === 'delivered' ? '100%' :
-                                    m.widget.data.status === 'dispatched' ? '66%' :
-                                    m.widget.data.status === 'prepared' ? '33%' : '0%'
-                                  }` 
-                                }}
-                              />
-
-                              {(() => {
-                                const trackingData = m.widget.data;
-
-                                return [
-                                  { key: 'ordered', label: 'Ordered', icon: '📝' },
-                                  { key: 'prepared', label: 'Prepared', icon: '🎂' },
-                                  { key: 'dispatched', label: 'Dispatched', icon: '🚚' },
-                                  { key: 'delivered', label: 'Delivered', icon: '🎁' }
-                                ].map((step, idx, arr) => {
-                                  const currentStatus = trackingData.status;
-                                  const statusIdx = arr.findIndex(s => s.key === currentStatus);
-                                  const isActive = idx <= statusIdx;
-                                  const isCurrent = idx === statusIdx;
-
-                                  return (
-                                    <div key={step.key} className="relative z-10 flex flex-col items-center">
-                                      <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs transition-all duration-500 shadow-sm ${
-                                        isCurrent 
-                                          ? 'bg-terracotta text-white ring-4 ring-terracotta/20 ring-offset-2Ring animate-pulse'
-                                          : isActive 
-                                            ? 'bg-slate-black text-white' 
-                                            : 'bg-warm-alabaster text-slate-black/35 border border-border-warm'
-                                      }`}>
-                                        <span>{step.icon}</span>
-                                      </div>
-                                      <span className={`text-[9px] mt-2 font-semibold tracking-wider uppercase transition-colors duration-300 ${
-                                        isActive ? 'text-slate-black' : 'text-slate-black/35'
-                                      }`}>
-                                        {step.label}
-                                      </span>
+                        {(() => {
+                          const allWidgets = m.widgets || (m.widget ? [m.widget] : []);
+                          return allWidgets.map((widget, wIdx) => {
+                            if (widget.type === 'delivery') {
+                              return (
+                                <div key={wIdx} className="mt-3 p-4 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-4 w-4 text-terracotta shrink-0" />
+                                      <span className="text-sm font-bold tracking-wide uppercase">{widget.data.city}</span>
                                     </div>
-                                  );
-                                });
-                              })()}
-                            </div>
-
-                            <div className="text-[11px] text-slate-black/60 font-light leading-relaxed border-t border-border-warm pt-3 space-y-1">
-                              <div className="flex justify-between">
-                                <span>Destination:</span>
-                                <span className="font-semibold text-slate-black">{m.widget.data.city}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Items:</span>
-                                <span className="font-semibold text-slate-black line-clamp-1">{m.widget.data.items}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {m.widget && m.widget.type === 'product_info' && (
-                          <div className="mt-3 p-4 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-4">
-                            {/* Product Header */}
-                            <div className="flex gap-3 items-center">
-                              <div className="w-14 h-14 rounded-lg overflow-hidden border border-border-warm relative shrink-0">
-                                <GiftingImage
-                                  src={m.widget.data.image}
-                                  alt={m.widget.data.name}
-                                  fill
-                                  sizes="56px"
-                                  className="object-cover"
-                                  category={m.widget.data.name}
-                                />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-xs font-bold leading-snug text-slate-black line-clamp-2">{m.widget.data.name}</h4>
-                                <div className="flex items-center gap-2 mt-1.5">
-                                  <span className="text-xs font-bold text-terracotta">LKR {m.widget.data.price.toLocaleString()}</span>
-                                  <span className="text-[9px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-semibold">
-                                    {m.widget.data.stock}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Description */}
-                            <p className="text-[11px] text-slate-black/60 font-light leading-relaxed line-clamp-2">
-                              {m.widget.data.description}
-                            </p>
-
-                            {/* Specs Badges */}
-                            <div className="grid grid-cols-2 gap-2 text-[10px] bg-warm-alabaster/40 p-2.5 rounded-lg border border-border-warm">
-                              <div className="flex flex-col">
-                                <span className="text-slate-black/45 text-[9px] uppercase tracking-wider font-semibold">Weight</span>
-                                <span className="font-medium text-slate-black mt-0.5">{m.widget.data.weight}</span>
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-slate-black/45 text-[9px] uppercase tracking-wider font-semibold">Portions</span>
-                                <span className="font-medium text-slate-black mt-0.5">8 - 10 Servings</span>
-                              </div>
-                            </div>
-
-                            {/* Ingredients list */}
-                            <div className="space-y-1.5">
-                              <span className="text-[9px] uppercase tracking-wider font-bold text-slate-black/45 block">Ingredients</span>
-                              <div className="flex flex-wrap gap-1">
-                                {m.widget.data.ingredients.map((ing: string, i: number) => (
-                                  <span key={i} className="text-[9px] bg-slate-black/5 text-slate-black/75 px-2 py-0.5 rounded-md font-medium">
-                                    {ing}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Allergens warning */}
-                            {m.widget.data.allergens.length > 0 && (
-                              <div className="space-y-1.5 border-t border-border-warm pt-3">
-                                <span className="text-[9px] uppercase tracking-wider font-bold text-red-600/80 block">Allergen Information</span>
-                                <div className="flex flex-wrap gap-1">
-                                  {m.widget.data.allergens.map((alg: string, i: number) => (
-                                    <span key={i} className="text-[9px] bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-md font-semibold">
-                                      ⚠️ Contains {alg}
+                                    <span className={`text-[10px] px-2 py-1 rounded-full font-semibold uppercase tracking-wider ${
+                                      widget.data.deliverable 
+                                        ? 'bg-green-50 text-green-700 border border-green-200' 
+                                        : 'bg-red-50 text-red-700 border border-red-200'
+                                    }`}>
+                                      {widget.data.deliverable ? 'Deliverable' : 'Unavailable'}
                                     </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {m.widget && m.widget.type === 'cart_add_success' && (
-                          <div className="mt-3 p-4 rounded-xl border border-green-200 bg-green-50/50 shadow-sm text-slate-black space-y-3">
-                            <div className="flex gap-3 items-center">
-                              <div className="w-12 h-12 rounded-lg overflow-hidden border border-border-warm relative shrink-0">
-                                <GiftingImage
-                                  src={m.widget.data.image}
-                                  alt={m.widget.data.productName}
-                                  fill
-                                  sizes="48px"
-                                  className="object-cover"
-                                  category={m.widget.data.productName}
-                                />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-xs font-bold leading-snug text-slate-black line-clamp-1">{m.widget.data.productName}</h4>
-                                <p className="text-[10px] text-green-700 font-semibold mt-1">✓ Added to Gifting Cart</p>
-                              </div>
-                            </div>
-                            <div className="text-xs space-y-1 border-t border-green-100 pt-2 text-slate-black/75">
-                              <div className="flex justify-between">
-                                <span>Quantity:</span>
-                                <span className="font-semibold text-slate-black">{m.widget.data.quantity}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Deliver to:</span>
-                                <span className="font-semibold text-slate-black">{m.widget.data.city} ({m.widget.data.date})</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Subtotal:</span>
-                                <span className="font-semibold text-slate-black">LKR {(m.widget.data.price * m.widget.data.quantity).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Delivery Fee:</span>
-                                <span className="font-semibold text-slate-black">LKR {m.widget.data.deliveryFee.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between border-t border-green-200 pt-1.5 font-bold text-slate-black">
-                                <span>Total Price:</span>
-                                <span className="text-terracotta">LKR {m.widget.data.total.toLocaleString()}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {m.widget && m.widget.type === 'recommendations' && (
-                          <div className="mt-3 space-y-3">
-                            <span className="text-[9px] uppercase tracking-wider font-bold text-slate-black/45 block mb-1">
-                              AI Recommended for {m.widget.data.occasion}
-                            </span>
-                            <div className="flex gap-3 overflow-x-auto pb-2 scroll-smooth" style={{ overscrollBehaviorX: 'contain' }}>
-                              {m.widget.data.products.map((p: { id: string; name: string; price: number; image: string; stock: string; category?: string; url?: string; weight?: string }) => (
-                                <div key={p.id} className="w-[180px] shrink-0 p-3 bg-card-bg border border-border-warm rounded-xl shadow-sm flex flex-col justify-between">
-                                  <div className="space-y-2">
-                                    <div className="aspect-video w-full rounded-lg overflow-hidden border border-border-warm relative">
-                                      <GiftingImage
-                                        src={p.image}
-                                        alt={p.name}
-                                        fill
-                                        sizes="160px"
-                                        className="object-cover"
-                                        category={p.name}
-                                      />
-                                    </div>
-                                    <h5 className="text-[11px] font-bold text-slate-black line-clamp-2 leading-snug">{p.name}</h5>
                                   </div>
                                   
-                                  <div className="mt-3 space-y-2">
-                                    <div className="flex justify-between items-center text-[10px]">
-                                      <span className="font-bold text-terracotta">LKR {p.price.toLocaleString()}</span>
-                                      <span className="text-[9px] text-slate-black/55">{p.stock}</span>
+                                  <div className="text-xs space-y-1">
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-black/55 font-light">Delivery Date:</span>
+                                      <span className="font-semibold">{widget.data.date}</span>
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleProductSelect({
-                                        id: p.id,
-                                        name: p.name,
-                                        price: p.price,
-                                        image: p.image,
-                                        stock: p.stock,
-                                        category: p.category || 'General',
-                                        url: p.url || '#'
-                                      })}
-                                      className="w-full py-1.5 bg-slate-black hover:bg-terracotta text-white rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors cursor-pointer text-center"
-                                    >
-                                      Choose
-                                    </button>
+                                    {widget.data.deliverable && (
+                                      <div className="flex justify-between">
+                                        <span className="text-slate-black/55 font-light">Shipping Fee:</span>
+                                        <span className="font-bold text-terracotta">LKR {widget.data.rate.toLocaleString()}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <p className="text-[11px] text-slate-black/60 font-light italic leading-snug border-t border-border-warm pt-2">
+                                    {widget.data.message}
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            if (widget.type === 'tracking') {
+                              return (
+                                <div key={wIdx} className="mt-3 p-4 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-4 min-w-[260px] md:min-w-[320px]">
+                                  <div className="flex items-center justify-between border-b border-border-warm pb-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-bold font-mono tracking-wider text-slate-black">{widget.data.orderNumber}</span>
+                                    </div>
+                                    <span className="text-[9px] bg-slate-black/5 text-slate-black/75 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">
+                                      Live Status
+                                    </span>
+                                  </div>
+
+                                  {/* Progress Timeline */}
+                                  <div className="relative flex justify-between items-center px-1 py-4">
+                                    {/* Connection lines */}
+                                    <div className="absolute left-6 right-6 top-1/2 h-0.5 bg-border-warm -translate-y-1/2 z-0" />
+                                    <div 
+                                      className="absolute left-6 top-1/2 h-0.5 bg-terracotta -translate-y-1/2 z-0 transition-all duration-1000 ease-out" 
+                                      style={{ 
+                                        width: `${
+                                          widget.data.status === 'delivered' ? '100%' :
+                                          widget.data.status === 'dispatched' ? '66%' :
+                                          widget.data.status === 'prepared' ? '33%' : '0%'
+                                        }` 
+                                      }}
+                                    />
+
+                                    {(() => {
+                                      const trackingData = widget.data;
+
+                                      return [
+                                        { key: 'ordered', label: 'Ordered', icon: '📝' },
+                                        { key: 'prepared', label: 'Prepared', icon: '🎂' },
+                                        { key: 'dispatched', label: 'Dispatched', icon: '🚚' },
+                                        { key: 'delivered', label: 'Delivered', icon: '🎁' }
+                                      ].map((step, idx, arr) => {
+                                        const currentStatus = trackingData.status;
+                                        const statusIdx = arr.findIndex(s => s.key === currentStatus);
+                                        const isActive = idx <= statusIdx;
+                                        const isCurrent = idx === statusIdx;
+
+                                        return (
+                                          <div key={step.key} className="relative z-10 flex flex-col items-center">
+                                            <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs transition-all duration-500 shadow-sm ${
+                                              isCurrent 
+                                                ? 'bg-terracotta text-white ring-4 ring-terracotta/20 ring-offset-2Ring animate-pulse'
+                                                : isActive 
+                                                  ? 'bg-slate-black text-white' 
+                                                  : 'bg-warm-alabaster text-slate-black/35 border border-border-warm'
+                                            }`}>
+                                              <span>{step.icon}</span>
+                                            </div>
+                                            <span className={`text-[9px] mt-2 font-semibold tracking-wider uppercase transition-colors duration-300 ${
+                                              isActive ? 'text-slate-black' : 'text-slate-black/35'
+                                            }`}>
+                                              {step.label}
+                                            </span>
+                                          </div>
+                                        );
+                                      });
+                                    })()}
+                                  </div>
+
+                                  <div className="text-[11px] text-slate-black/60 font-light leading-relaxed border-t border-border-warm pt-3 space-y-1">
+                                    <div className="flex justify-between">
+                                      <span>Destination:</span>
+                                      <span className="font-semibold text-slate-black">{widget.data.city}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Items:</span>
+                                      <span className="font-semibold text-slate-black line-clamp-1">{widget.data.items}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                              );
+                            }
 
-                        {m.widget && m.widget.type === 'compose_greeting' && (
-                          <div className="mt-3 p-3 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-3">
-                            <span className="text-[9px] uppercase tracking-wider font-bold text-slate-black/45 block">
-                              AI Composed Notes
-                            </span>
-                            <div className="space-y-2.5">
-                              {m.widget.data.options.map((option: string, i: number) => (
-                                <div key={i} className="group relative p-2.5 bg-warm-alabaster/40 border border-border-warm rounded-lg text-xs hover:border-terracotta/40 transition-colors">
-                                  <p className="italic text-slate-black/85 leading-relaxed pr-12">&quot;{option}&quot;</p>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      saveGiftMessage(option);
-                                      setMessages(prev => [
-                                        ...prev,
-                                        {
-                                          sender: 'ai',
-                                          text: chatLanguage === 'si'
-                                            ? `සුබපැතුම් පතේ පණිවිඩය ලෙස ${i + 1} වන විකල්පය ඇතුලත් කරන ලදී! ඔබට එය Checkout විස්තර තුල බලාගත හැක.`
-                                            : `Applied note option ${i + 1} to your gift card! You can see it inside the Checkout details.`,
-                                          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                        }
-                                      ]);
-                                    }}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-terracotta hover:bg-slate-black text-white text-[9px] font-bold rounded-md uppercase tracking-wider transition-colors cursor-pointer"
-                                  >
-                                    Apply
-                                  </button>
+                            if (widget.type === 'product_info') {
+                              return (
+                                <div key={wIdx} className="mt-3 p-4 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-4">
+                                  {/* Product Header */}
+                                  <div className="flex gap-3 items-center">
+                                    <div className="w-14 h-14 rounded-lg overflow-hidden border border-border-warm relative shrink-0">
+                                      <GiftingImage
+                                        src={widget.data.image}
+                                        alt={widget.data.name}
+                                        fill
+                                        sizes="56px"
+                                        className="object-cover"
+                                        category={widget.data.name}
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-xs font-bold leading-snug text-slate-black line-clamp-2">{widget.data.name}</h4>
+                                      <div className="flex items-center gap-2 mt-1.5">
+                                        <span className="text-xs font-bold text-terracotta">LKR {widget.data.price.toLocaleString()}</span>
+                                        <span className="text-[9px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-semibold">
+                                          {widget.data.stock}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Description */}
+                                  <p className="text-[11px] text-slate-black/60 font-light leading-relaxed line-clamp-2">
+                                    {widget.data.description}
+                                  </p>
+
+                                  {/* Specs Badges */}
+                                  <div className="grid grid-cols-2 gap-2 text-[10px] bg-warm-alabaster/40 p-2.5 rounded-lg border border-border-warm">
+                                    <div className="flex flex-col">
+                                      <span className="text-slate-black/45 text-[9px] uppercase tracking-wider font-semibold">Weight</span>
+                                      <span className="font-medium text-slate-black mt-0.5">{widget.data.weight}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-slate-black/45 text-[9px] uppercase tracking-wider font-semibold">Portions</span>
+                                      <span className="font-medium text-slate-black mt-0.5">8 - 10 Servings</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Ingredients list */}
+                                  <div className="space-y-1.5">
+                                    <span className="text-[9px] uppercase tracking-wider font-bold text-slate-black/45 block">Ingredients</span>
+                                    <div className="flex flex-wrap gap-1">
+                                      {widget.data.ingredients.map((ing, i) => (
+                                        <span key={i} className="text-[9px] bg-slate-black/5 text-slate-black/75 px-2 py-0.5 rounded-md font-medium">
+                                          {ing}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Allergens warning */}
+                                  {widget.data.allergens.length > 0 && (
+                                    <div className="space-y-1.5 border-t border-border-warm pt-3">
+                                      <span className="text-[9px] uppercase tracking-wider font-bold text-red-600/80 block">Allergen Information</span>
+                                      <div className="flex flex-wrap gap-1">
+                                        {widget.data.allergens.map((alg, i) => (
+                                          <span key={i} className="text-[9px] bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-md font-semibold">
+                                            ⚠️ Contains {alg}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                              );
+                            }
+
+                            if (widget.type === 'cart_add_success') {
+                              return (
+                                <div key={wIdx} className="mt-3 p-4 rounded-xl border border-green-200 bg-green-50/50 shadow-sm text-slate-black space-y-3">
+                                  <div className="flex gap-3 items-center">
+                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-border-warm relative shrink-0">
+                                      <GiftingImage
+                                        src={widget.data.image}
+                                        alt={widget.data.productName}
+                                        fill
+                                        sizes="48px"
+                                        className="object-cover"
+                                        category={widget.data.productName}
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-xs font-bold leading-snug text-slate-black line-clamp-1">{widget.data.productName}</h4>
+                                      <p className="text-[10px] text-green-700 font-semibold mt-1">✓ Added to Gifting Cart</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-xs space-y-1 border-t border-green-100 pt-2 text-slate-black/75">
+                                    <div className="flex justify-between">
+                                      <span>Quantity:</span>
+                                      <span className="font-semibold text-slate-black">{widget.data.quantity}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Deliver to:</span>
+                                      <span className="font-semibold text-slate-black">{widget.data.city} ({widget.data.date})</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Subtotal:</span>
+                                      <span className="font-semibold text-slate-black">LKR {(widget.data.price * widget.data.quantity).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Delivery Fee:</span>
+                                      <span className="font-semibold text-slate-black">LKR {widget.data.deliveryFee.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-green-200 pt-1.5 font-bold text-slate-black">
+                                      <span>Total Price:</span>
+                                      <span className="text-terracotta">LKR {widget.data.total.toLocaleString()}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (widget.type === 'recommendations') {
+                              return (
+                                <div key={wIdx} className="mt-3 space-y-3">
+                                  <span className="text-[9px] uppercase tracking-wider font-bold text-slate-black/45 block mb-1">
+                                    AI Recommended for {widget.data.occasion}
+                                  </span>
+                                  <div className="flex gap-3 overflow-x-auto pb-2 scroll-smooth" style={{ overscrollBehaviorX: 'contain' }}>
+                                    {widget.data.products.map((p) => (
+                                      <div key={p.id} className="w-[180px] shrink-0 p-3 bg-card-bg border border-border-warm rounded-xl shadow-sm flex flex-col justify-between">
+                                        <div className="space-y-2">
+                                          <div className="aspect-video w-full rounded-lg overflow-hidden border border-border-warm relative">
+                                            <GiftingImage
+                                              src={p.image}
+                                              alt={p.name}
+                                              fill
+                                              sizes="160px"
+                                              className="object-cover"
+                                              category={p.name}
+                                            />
+                                          </div>
+                                          <h5 className="text-[11px] font-bold text-slate-black line-clamp-2 leading-snug">{p.name}</h5>
+                                        </div>
+                                        
+                                        <div className="mt-3 space-y-2">
+                                          <div className="flex justify-between items-center text-[10px]">
+                                            <span className="font-bold text-terracotta">LKR {p.price.toLocaleString()}</span>
+                                            <span className="text-[9px] text-slate-black/55">{p.stock}</span>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleProductSelect({
+                                              id: p.id,
+                                              name: p.name,
+                                              price: p.price,
+                                              image: p.image,
+                                              stock: p.stock,
+                                              category: p.category || 'General',
+                                              url: p.url || '#'
+                                            })}
+                                            className="w-full py-1.5 bg-slate-black hover:bg-terracotta text-white rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors cursor-pointer text-center"
+                                          >
+                                            Choose
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (widget.type === 'compose_greeting') {
+                              return (
+                                <div key={wIdx} className="mt-3 p-3 rounded-xl border border-border-warm bg-card-bg shadow-sm text-slate-black space-y-3">
+                                  <span className="text-[9px] uppercase tracking-wider font-bold text-slate-black/45 block">
+                                    AI Composed Notes
+                                  </span>
+                                  <div className="space-y-2.5">
+                                    {widget.data.options.map((option, i) => (
+                                      <div key={i} className="group relative p-2.5 bg-warm-alabaster/40 border border-border-warm rounded-lg text-xs hover:border-terracotta/40 transition-colors">
+                                        <p className="italic text-slate-black/85 leading-relaxed pr-12">&quot;{option}&quot;</p>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            saveGiftMessage(option);
+                                            setMessages(prev => [
+                                              ...prev,
+                                              {
+                                                sender: 'ai',
+                                                text: chatLanguage === 'si'
+                                                  ? `සුබපැතුම් පතේ පණිවිඩය ලෙස ${i + 1} වන විකල්පය ඇතුලත් කරන ලදී! ඔබට එය Checkout විස්තර තුල බලාගත හැක.`
+                                                  : `Applied note option ${i + 1} to your gift card! You can see it inside the Checkout details.`,
+                                                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                              }
+                                            ]);
+                                          }}
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-terracotta hover:bg-slate-black text-white text-[9px] font-bold rounded-md uppercase tracking-wider transition-colors cursor-pointer"
+                                        >
+                                          Apply
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          });
+                        })()}
 
                         <span
                           className={`block text-[10px] mt-1.5 font-mono ${
@@ -2199,6 +2271,7 @@ export default function Home() {
                 <CheckoutForm
                   cartItems={cart}
                   giftMessage={giftMessage}
+                  onUpdateGiftMessage={saveGiftMessage}
                   initialCity={searchCriteria?.city || 'Colombo'}
                   initialDate={searchCriteria?.date || ''}
                   prefilledRecipient={prefilledRecipient}

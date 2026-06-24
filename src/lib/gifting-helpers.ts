@@ -218,6 +218,7 @@ export const generateGreetings = (
  */
 export function localFallbackParse(query: string, isSinhalaMode: boolean = false): {
   detectedIntent: 'search' | 'check_delivery' | 'track_order' | 'get_product_info' | 'general' | 'add_to_cart' | 'recommend' | 'compose_greeting';
+  detectedIntents: ('search' | 'check_delivery' | 'track_order' | 'get_product_info' | 'general' | 'add_to_cart' | 'recommend' | 'compose_greeting')[];
   detectedCategory: string;
   cleanSearchTerm: string;
   requiresClarification: boolean;
@@ -248,25 +249,31 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   conversationalReply: string;
 } {
   const q = query.toLowerCase();
-  let detectedIntent: 'search' | 'check_delivery' | 'track_order' | 'get_product_info' | 'general' | 'add_to_cart' | 'recommend' | 'compose_greeting' = 'general';
-  let detectedCategory = 'all';
-  let cleanSearchTerm = 'gift';
-  let giftType = 'Gifts';
+  
+  // Multiple intent detection for local parser
+  const intents: ('search' | 'check_delivery' | 'track_order' | 'get_product_info' | 'general' | 'add_to_cart' | 'recommend' | 'compose_greeting')[] = [];
+  const isGreetingQuery = q.includes('write') || q.includes('compose') || q.includes('message') || q.includes('note') || q.includes('greeting') || q.includes('card') || q.includes('text') || q.includes('wachana') || q.includes('wording');
+  
+  if (isGreetingQuery) {
+    intents.push('compose_greeting');
+  }
+  if (q.includes('add') && (q.includes('cart') || q.includes('basket'))) {
+    intents.push('add_to_cart');
+  }
+  if (q.includes('recommend') || q.includes('suggest') || q.includes('gift idea') || q.includes('birthday') || q.includes('anniversary') || q.includes('occasion')) {
+    intents.push('recommend');
+  }
+  if (q.includes('track') || q.includes('where is') || q.includes('ord-') || q.includes('taththata yawwa')) {
+    intents.push('track_order');
+  }
+  if (q.includes('deliver') || q.includes('rate') || q.includes('open da') || q.includes('fee')) {
+    intents.push('check_delivery');
+  }
+  if (q.includes('eggless') || q.includes('ingredient') || q.includes('allergen') || q.includes('size') || q.includes('weight')) {
+    intents.push('get_product_info');
+  }
 
-  // Basic intent classification - prioritized compose_greeting first
-  if (q.includes('write') || q.includes('compose') || q.includes('message') || q.includes('note') || q.includes('greeting') || q.includes('card') || q.includes('text') || q.includes('wachana') || q.includes('wording')) {
-    detectedIntent = 'compose_greeting';
-  } else if (q.includes('add') && (q.includes('cart') || q.includes('basket'))) {
-    detectedIntent = 'add_to_cart';
-  } else if (q.includes('recommend') || q.includes('suggest') || q.includes('gift idea') || q.includes('birthday') || q.includes('anniversary') || q.includes('occasion')) {
-    detectedIntent = 'recommend';
-  } else if (q.includes('track') || q.includes('where is') || q.includes('ord-') || q.includes('taththata yawwa')) {
-    detectedIntent = 'track_order';
-  } else if (q.includes('deliver') || q.includes('rate') || q.includes('open da') || q.includes('fee')) {
-    detectedIntent = 'check_delivery';
-  } else if (q.includes('eggless') || q.includes('ingredient') || q.includes('allergen') || q.includes('size') || q.includes('weight')) {
-    detectedIntent = 'get_product_info';
-  } else {
+  if (intents.length === 0) {
     const hasCategory = q.includes('cake') || q.includes('කේක්') || q.includes('keik') || q.includes('kake') || q.includes('kek') ||
                         q.includes('flower') || q.includes('මල්') || q.includes('mal') || q.includes('rose') || q.includes('roja') || q.includes('mal-wattiya') ||
                         q.includes('chocolate') || q.includes('චොකලට්') || q.includes('choc') || q.includes('chocalate') || q.includes('choclet') ||
@@ -274,11 +281,17 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
                         q.includes('gift') || q.includes('තෑගි') || q.includes('toy') || q.includes('teddy') || q.includes('perfume') || q.includes('thagi') ||
                         q.includes('search') || q.includes('find') || q.includes('show') || q.includes('list') || q.includes('get') || q.includes('buy') || q.includes('order');
     if (hasCategory) {
-      detectedIntent = 'search';
+      intents.push('search');
     } else {
-      detectedIntent = 'general';
+      intents.push('general');
     }
   }
+
+  const detectedIntent = intents[0];
+  const detectedIntents = intents;
+  let detectedCategory = 'all';
+  let cleanSearchTerm = 'gift';
+  let giftType = 'Gifts';
 
   // Category mapping
   if (q.includes('cake') || q.includes('කේක්') || q.includes('keik') || q.includes('kake') || q.includes('kek')) {
@@ -529,6 +542,7 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
 
   return {
     detectedIntent,
+    detectedIntents,
     detectedCategory,
     cleanSearchTerm,
     requiresClarification,
@@ -618,6 +632,17 @@ export function extractCustomMemories(query: string, relationship?: string | nul
 
   // If the remaining string is very short or empty, there is no custom memory.
   if (cleaned.length < 4) {
+    return null;
+  }
+
+  // Bilingual filter: Strip shopping/product/action terms and common stop words to check if any actual anecdote remains
+  let checkMemory = cleaned.replace(/(?:cake|keik|කේක්|flower|mal|මල්|rose|rosa|රෝස|chocolate|චොකලට්|recommend|suggest|නිර්දේශ|search|find|සොයන්න|order|ඇණවුම්|buy|මිලදී|show|පෙන්වන්න|add|cart|කාර්ට්|delivery|බෙදාහැරීමේ|rate|price|cost|මිල|ගාස්තු|how\s*much|keeyada|kiyada)/gi, '');
+  const stopWordsPattern = /\b(?:i|a|an|the|and|or|but|if|then|else|me|you|we|he|she|it|they|us|him|her|them|my|your|his|her|its|our|their|mine|yours|ours|theirs|to|for|in|on|at|with|about|against|between|into|through|during|before|after|above|below|from|up|down|in|out|off|over|under|again|further|then|once|here|there|when|where|why|how|all|any|both|each|few|more|most|other|some|such|no|nor|not|only|own|same|so|than|too|very|s|t|can|will|just|don|should|now|is|am|are|was|were|be|been|being|have|has|had|having|do|does|did|doing|please|would|could|should|shall|must|may|might|mama|mage|mata|oba|obage|obata|oya|oyage|oyata|apa|ape|apata|eya|saha|ho|sadhaha|wetha|karunakara|puluwan|one|oni|atha|natha|na|naha|මම|මගේ|මට|ඔබ|ඔබේ|ඔබට|ඔයා|ඔයාගේ|ඔයාට|අප|අපේ|අපට|එය|එහි|සහ|හෝ|සඳහා|වෙත|කරුණාකර|පුළුවන්|ඕනෑ|ඇත|නැත)\b/gi;
+  checkMemory = checkMemory.replace(stopWordsPattern, '');
+  checkMemory = checkMemory.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'’]/g, '');
+  checkMemory = checkMemory.replace(/\s+/g, ' ').trim();
+
+  if (checkMemory.length < 4) {
     return null;
   }
 

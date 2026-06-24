@@ -26,6 +26,7 @@ interface CartItem {
 interface CheckoutFormProps {
   cartItems: CartItem[];
   giftMessage: string;
+  onUpdateGiftMessage?: (message: string) => void;
   initialCity: string;
   initialDate: string;
   prefilledRecipient?: {
@@ -47,6 +48,7 @@ interface CheckoutFormProps {
 export default function CheckoutForm({
   cartItems,
   giftMessage,
+  onUpdateGiftMessage,
   initialCity,
   initialDate,
   prefilledRecipient,
@@ -406,13 +408,22 @@ export default function CheckoutForm({
 
               {/* Greeting Card message display */}
               <div className="border border-border-warm rounded-xl p-4 bg-warm-alabaster/85 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-black/60 uppercase tracking-wider">
-                  <User className="h-3.5 w-3.5 text-slate-black/40" />
-                  <span>Greeting Card Message</span>
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-black/60 uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-slate-black/40" />
+                    <span>Greeting Card Message</span>
+                  </div>
+                  <span className="text-[10px] font-normal text-slate-black/45 lowercase font-mono">
+                    {giftMessage.length}/300 characters
+                  </span>
                 </div>
-                <p className="text-xs text-slate-black/85 font-light italic leading-relaxed">
-                  {giftMessage ? `"${giftMessage}"` : 'No message written. A generic elegant greeting card will be attached.'}
-                </p>
+                <textarea
+                  className="w-full min-h-[80px] p-2.5 bg-white border border-border-warm rounded-lg text-xs text-slate-black/85 font-light focus:outline-none focus:ring-1 focus:ring-terracotta transition-all resize-none"
+                  value={giftMessage}
+                  onChange={(e) => onUpdateGiftMessage?.(e.target.value.slice(0, 300))}
+                  placeholder="Enter greeting card message here..."
+                  maxLength={300}
+                />
               </div>
 
               <button
