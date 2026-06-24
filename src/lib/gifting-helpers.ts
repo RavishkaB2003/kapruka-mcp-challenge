@@ -60,7 +60,8 @@ export const generateGreetings = (
   occasion: string | null,
   tone: string | null,
   memories?: string | null,
-  isSinhala: boolean = false
+  isSinhala: boolean = false,
+  recipientName?: string | null
 ): string[] => {
   const rel = relationship?.trim() || 'someone special';
   const relLower = rel.toLowerCase();
@@ -102,14 +103,16 @@ export const generateGreetings = (
         ];
       }
       if (relLower.includes('partner') || relLower.includes('love') || relLower.includes('boyfriend') || relLower.includes('girlfriend') || relLower.includes('husband') || relLower.includes('wife')) {
+        const nameToUse = recipientName || 'ආදරණීයයා';
         return [
-          `මගේ ආදරණීයයා වෙත, ඔබට සුබ උපන්දිනයක් වේවා! මගේ ජීවිතය ලස්සන කලාට ස්තුතියි. ආදරෙයි සැමදා!${memorySuffix}`,
+          `මගේ ආදරණීය ${nameToUse} වෙත, ඔබට සුබ උපන්දිනයක් වේවා! මගේ ජීවිතය ලස්සන කලාට ස්තුතියි. ආදරෙයි සැමදා!${memorySuffix}`,
           `සුබ උපන්දිනයක් මගේ පණ! ඔබ මගේ ළඟින් සිටීම මට ලොකුම සතුටක්. සදාකල් මා සමඟ රැඳෙන්න!${memorySuffix ? ` (${memories})` : ''}`,
           `සුබ උපන්දිනයක්!${memorySuffix} මගේ මුළු ජීවිතයම ඔබයි.`
         ];
       }
+      const nameToUse = recipientName || relNameSi;
       return [
-        `${relNameSi} වෙත, ඔබට සුබ උපන්දිනයක් වේවා! මේ විශේෂ දිනයේ ඔබ පතන සියලුම පැතුම් ඉටුවේවා කියා පතමි!${memorySuffix}`,
+        `${nameToUse} වෙත, ඔබට සුබ උපන්දිනයක් වේවා! මේ විශේෂ දිනයේ ඔබ පතන සියලුම පැතුම් ඉටුවේවා කියා පතමි!${memorySuffix}`,
         `සුබ උපන්දිනයක් වේවා! ලැබුවා වූ නව වසර සතුට, සෞභාග්‍යය පිරි සුභ වසරක් වේවා!${memorySuffix}`,
         `උපන්දිනයට උණුසුම් සුබපැතුම්! මෙම සුවිශේෂී තෑග්ග ඔබව සිනහවෙන් තබනු ඇතැයි සිතමි.${memorySuffix}`
       ];
@@ -117,9 +120,10 @@ export const generateGreetings = (
 
     if (occ.includes('anniversary')) {
       const partnerRel = relLower.includes('partner') || relLower.includes('love') || relLower.includes('boyfriend') || relLower.includes('girlfriend') || relLower.includes('husband') || relLower.includes('wife');
+      const nameToUse = recipientName || 'ආදරණීයයා';
       if (partnerRel) {
         return [
-          `සුබ විවාහ සංවත්සරයක් වේවා, මගේ ආදරණීයයා! තවත් සුන්දර වසරක් මා සමඟ ගත කලාට ස්තුතියි.${memorySuffix}`,
+          `සුබ විවාහ සංවත්සරයක් වේවා, මගේ ආදරණීය ${nameToUse}! තවත් සුන්දර වසරක් මා සමඟ ගත කලාට ස්තුතියි.${memorySuffix}`,
           `සුබ සංවත්සරයක් වේවා! අපේ ආදරය තව තවත් ශක්තිමත් වේවා කියා පතමි.${memorySuffix ? ` (${memories})` : ''}`,
           `අපේ විවාහ සංවත්සරයට උණුසුම් සුබපැතුම්! ඔබ මා අසල සිටින තාක් මා ලොව වාසනාවන්තම පුද්ගලයායි.${memorySuffix}`
         ];
@@ -131,8 +135,9 @@ export const generateGreetings = (
       ];
     }
 
+    const nameToUse = recipientName || relNameSi;
     return [
-      `මෙම සුවිශේෂී තෑග්ග සමඟ මගේ ආදරය සහ උණුසුම් සුබපැතුම් ඔබ වෙත එවමි. සැමදා සතුටින් සිටින්න!${memorySuffix}`,
+      `මෙම සුවිශේෂී තෑග්ග සමඟ මගේ ආදරය සහ උණුසුම් සුබපැතුම් ${nameToUse} වෙත එවමි. සැමදා සතුටින් සිටින්න!${memorySuffix}`,
       `අද දවසේ ඔබ ගැන සිතමින්, දුර සිට වුවද මගේ හදපිරි සුබපැතුම් එවමි. තෑග්ග සතුටින් භාරගන්න!${memorySuffix ? ` (${memories})` : ''}`,
       `ඔබගේ දිනය සතුටින් හා ලස්සන මතකයන්ගෙන් පිරේවා කියා පතමි! මෙම පුදුමය භුක්ති විඳින්න!${memorySuffix}`
     ];
@@ -141,6 +146,8 @@ export const generateGreetings = (
   let relName = rel;
   if (relLower === 'partner' || relLower === 'love') relName = 'my love';
   
+  const displayAddressName = recipientName || relName;
+
   const memorySuffix = memories ? ` I still cherish ${memories} and look forward to more special times.` : '';
   const memoryInject = (defaultText: string, specificText: string) => {
     return memories ? specificText : defaultText;
@@ -148,8 +155,9 @@ export const generateGreetings = (
 
   if (occ.includes('birthday')) {
     if (relLower.includes('father') || relLower.includes('dad') || relLower.includes('thaththa')) {
+      const addressName = recipientName || relName;
       return [
-        `Happy Birthday, ${relName}! Thank you for always being my pillar of strength and support.${memorySuffix} Have a wonderful day!`,
+        `Happy Birthday, ${addressName}! Thank you for always being my pillar of strength and support.${memorySuffix} Have a wonderful day!`,
         memoryInject(
           `To the best ${relName} in the world, wishing you a birthday filled with love, joy, and all your favorite things!`,
           `To the best ${relName} in the world, wishing you a birthday filled with love. I still remember ${memories} and feel so lucky!`
@@ -158,8 +166,9 @@ export const generateGreetings = (
       ];
     }
     if (relLower.includes('mother') || relLower.includes('mom') || relLower.includes('amma')) {
+      const addressName = recipientName || relName;
       return [
-        `Happy Birthday, ${relName}! Thank you for your endless love, patience, and guidance.${memorySuffix} You are my guiding light.`,
+        `Happy Birthday, ${addressName}! Thank you for your endless love, patience, and guidance.${memorySuffix} You are my guiding light.`,
         memoryInject(
           `Wishing the most wonderful ${relName} a very Happy Birthday! May your day be as beautiful and loving as you are.`,
           `Wishing the most wonderful ${relName} a very Happy Birthday! Thinking of ${memories} brings a smile to my face today.`
@@ -168,7 +177,7 @@ export const generateGreetings = (
       ];
     }
     if (relLower.includes('partner') || relLower.includes('love') || relLower.includes('boyfriend') || relLower.includes('girlfriend') || relLower.includes('husband') || relLower.includes('wife')) {
-      const displayRel = relLower.includes('partner') || relLower.includes('love') ? 'my love' : relName;
+      const displayRel = recipientName || (relLower.includes('partner') || relLower.includes('love') ? 'my love' : relName);
       return [
         `Happy Birthday, ${displayRel}! You make my world so much brighter.${memorySuffix} Can't wait to celebrate many more with you.`,
         memoryInject(
@@ -179,8 +188,8 @@ export const generateGreetings = (
       ];
     }
     return [
-      `Happy Birthday, ${relName}! Wishing you a day as wonderful as you are.${memorySuffix} Enjoy your special gift!`,
-      `To a dear ${relName}, wishing you a year ahead filled with happiness, health, and success.${memorySuffix} Happy Birthday!`,
+      `Happy Birthday, ${displayAddressName}! Wishing you a day as wonderful as you are.${memorySuffix} Enjoy your special gift!`,
+      `To a dear ${displayAddressName}, wishing you a year ahead filled with happiness, health, and success.${memorySuffix} Happy Birthday!`,
       `Warmest birthday wishes! Hoping this year brings you countless reasons to smile. Enjoy the celebration!${memorySuffix}`
     ];
   }
@@ -188,8 +197,9 @@ export const generateGreetings = (
   if (occ.includes('anniversary')) {
     const partnerRel = relLower.includes('partner') || relLower.includes('love') || relLower.includes('boyfriend') || relLower.includes('girlfriend') || relLower.includes('husband') || relLower.includes('wife');
     if (partnerRel) {
+      const addressName = recipientName || (relName === 'someone special' ? 'my love' : relName);
       return [
-        `Happy Anniversary, ${relName === 'someone special' ? 'my love' : relName}! Thank you for another beautiful year together.${memorySuffix}`,
+        `Happy Anniversary, ${addressName}! Thank you for another beautiful year together.${memorySuffix}`,
         `Happy Anniversary! Thinking of ${memories || 'our wedding day'} and wishing us many more years of love and happiness.`,
         `To my wonderful partner, Happy Anniversary! ${memories ? `I will never forget ${memories} and how we grew together.` : 'Thank you for showing me what true love looks like.'}`
       ];
@@ -202,9 +212,9 @@ export const generateGreetings = (
   }
 
   return [
-    `Sending you this special gift, ${relName}, with all my love and warmest wishes.${memorySuffix} Hope it brings a big smile to your face!`,
-    `Thinking of you today, ${relName}, and sending warm hugs from afar.${memorySuffix} Hope you enjoy this little token of love!`,
-    `May your day be filled with unexpected joys and beautiful moments, ${relName}. Enjoy your special surprise!${memorySuffix}`
+    `Sending you this special gift, ${displayAddressName}, with all my love and warmest wishes.${memorySuffix} Hope it brings a big smile to your face!`,
+    `Thinking of you today, ${displayAddressName}, and sending warm hugs from afar.${memorySuffix} Hope you enjoy this little token of love!`,
+    `May your day be filled with unexpected joys and beautiful moments, ${displayAddressName}. Enjoy your special surprise!${memorySuffix}`
   ];
 };
 
@@ -404,13 +414,39 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     }
   }
 
-  const nameRegex = /(?:name is|name:|recipient is|recipient name is|recipient details:|for)\s+([a-z]+(?:\s+[a-z]+)?)/i;
-  const nameM = query.match(nameRegex);
-  if (nameM) {
-    const relationWords = ['boyfriend', 'girlfriend', 'husband', 'wife', 'dad', 'mom', 'father', 'mother', 'friend', 'someone', 'partner'];
-    const matchedName = nameM[1].trim();
-    if (!relationWords.includes(matchedName.toLowerCase())) {
-      extractedName = matchedName;
+  // 1. Nickname indicator (highest priority)
+  const nicknameM = query.match(/(?:we call him|we call her|call him|call her|nickname is)\s+([a-z]+)/i);
+  if (nicknameM) {
+    extractedName = nicknameM[1].trim();
+  }
+
+  // 2. Name indicator
+  if (!extractedName) {
+    const nameIndicatorM = query.match(/(?:name is|recipient name is|recipient is)\s+([a-z]+)/i);
+    if (nameIndicatorM) {
+      extractedName = nameIndicatorM[1].trim();
+    }
+  }
+
+  // 3. Recipient details / explicit name label
+  if (!extractedName) {
+    const detailsM = query.match(/(?:recipient details:|name:)\s+([a-z]+(?:\s+[a-z]+)?)/i);
+    if (detailsM) {
+      extractedName = detailsM[1].trim();
+    }
+  }
+
+  // 4. Vague "for [name]" pattern (lowest priority)
+  if (!extractedName) {
+    const forM = query.match(/\bfor\s+([a-z]+(?:\s+[a-z]+)?)/i);
+    if (forM) {
+      const relationWords = ['boyfriend', 'girlfriend', 'husband', 'wife', 'dad', 'mom', 'father', 'mother', 'friend', 'someone', 'partner', 'my', 'our', 'his', 'her', 'the', 'to', 'for', 'a', 'an'];
+      const matchedName = forM[1].trim();
+      const words = matchedName.toLowerCase().split(/\s+/);
+      const hasRelationWord = words.some(w => relationWords.includes(w));
+      if (!hasRelationWord) {
+        extractedName = matchedName;
+      }
     }
   }
 
@@ -567,8 +603,8 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
       occasion: occasion || (detectedIntent === 'recommend' ? 'Birthday' : null),
       tone: 'warm',
       relationship,
-      customMemory: extractCustomMemories(query, relationship, occasion),
-      recipientName: relationship ? relationship : null
+      customMemory: extractCustomMemories(query, relationship, occasion, extractedName),
+      recipientName: extractedName || (relationship ? relationship : null)
     },
     conversationalReply
   };
@@ -613,22 +649,77 @@ export function isNegativeResponse(text: string): boolean {
  * removing relationship words, occasion names, action verbs, and structural phrasing.
  * Returns null if no custom memory/anecdote is found.
  */
-export function extractCustomMemories(query: string, relationship?: string | null, occasion?: string | null): string | null {
+export function extractCustomMemories(
+  query: string, 
+  relationship?: string | null, 
+  occasion?: string | null,
+  recipientName?: string | null
+): string | null {
   if (isNegativeResponse(query)) {
     return null;
   }
 
+  // If the query contains multiple sentences, process them individually first
+  const sentences = query.split(/[.!?]+(?:[\s\n]+|$)/);
+  if (sentences.length > 1) {
+    for (const sentence of sentences) {
+      const trimmed = sentence.trim();
+      if (trimmed.length > 0) {
+        const memory = extractCustomMemories(trimmed, relationship, occasion, recipientName);
+        if (memory) {
+          return memory;
+        }
+      }
+    }
+    // If no individual sentence has a memory, we can continue to process the query as a whole
+  }
+
   let cleaned = query.toLowerCase();
 
-  // Pattern of words to remove:
-  // - Gifting/writing actions:
-  cleaned = cleaned.replace(/(?:compose|write|generate|create|send|get|want|need|wording|words|message|note|card|text for the card|text for card|card text|greeting|wachana|one|yawanna|danna|hදන්න|ලියන්න)/gi, '');
-  // - Relationship terms (English, Tanglish, Sinhala):
-  cleaned = cleaned.replace(/(?:father|dad|thaththa|thaththata|පියා|තාත්තා|තාත්තට|mother|mom|amma|ammata|අම්මා|අම්මට|පියාණන්|පියාණන්ට|brother|malli|ayiya|mallita|ayyata|මල්ලි|අයියා|sister|nangi|akka|nangita|akkata|නංගි|අක්කා|friend|yaluwa|yaluwata|මිතුරා|යාලුවා|partner|love|husband|wife|gf|bf|sudoo|බිරිඳ|සැමියා|ආදරණීයයා)/gi, '');
-  // - Occasion terms (English, Tanglish, Sinhala):
-  cleaned = cleaned.replace(/(?:birthday|bday|upandinaya|updandinaya|upadinaya|updandinayata|upandinayata|upadinayata|උපන්දිනය|උපන්දින|anniversary|wedding|සංවත්සරය|anniversariya|retirement|විශ්‍රාම|graduation|උපාධි|valentines|valentine|christmas)/gi, '');
-  // - Pronominal/prepositional noise:
-  cleaned = cleaned.replace(/(?:for my|for|to my|to|my|it is for|on our|for our|on my|for my|his|her|our|we|our memory is|memory of|memories are|memories of|මට|මගේ|ඔබට|ඔයාට|සුබ|සුභ|wewa|වේවා)/gi, '');
+  // Pattern of words to remove (including transaction/shopping/recommendation and name/nickname phrases)
+  // 1. Gifting/writing actions & transactional shopping phrases
+  const shoppingActions = /\b(?:compose|write|generate|create|send|get|want|need|wording|words|message|note|card|text for the card|text for card|card text|greeting|wachana|one|yawanna|danna|hදන්න|ලියන්න|recommend|suggest|search|find|order|buy|show|add|cart|basket|delivery|deliver|rate|fee|price|cost|how\s*much|keeyada|kiyada|gana|ganan)\b/gi;
+  cleaned = cleaned.replace(shoppingActions, '');
+
+  // 2. Product Categories
+  const productCategories = /\b(?:cake|cakes|keik|කේක්|flower|flowers|mal|මල්|rose|roses|rosa|රෝස|chocolate|chocolates|චොකලට්|grocery|groceries|fruit|fruits|vegetable|vegetables|gift|uniquegifts|toy|teddy|perfume)\b/gi;
+  cleaned = cleaned.replace(productCategories, '');
+
+  // 3. Name & nickname phrases
+  const nicknamePhrases = /\b(?:his name is|her name is|my name is|its name is|we call him|we call her|call him|call her|name is|called|nickname|name)\b/gi;
+  cleaned = cleaned.replace(nicknamePhrases, '');
+
+  // 4. Dynamic name detection and stripping
+  const namePattern = /(?:his name is|her name is|name is|recipient name is|recipient is|called|nickname is|call him|call her)\s+([a-z]+)/gi;
+  let match;
+  const tempQuery = query.toLowerCase();
+  const namesToStrip = new Set<string>();
+  while ((match = namePattern.exec(tempQuery)) !== null) {
+    if (match[1]) {
+      namesToStrip.add(match[1]);
+    }
+  }
+  if (recipientName) {
+    namesToStrip.add(recipientName.toLowerCase());
+  }
+
+  for (const nameWord of namesToStrip) {
+    const escaped = nameWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nameRegex = new RegExp(`\\b${escaped}\\b`, 'gi');
+    cleaned = cleaned.replace(nameRegex, '');
+  }
+
+  // 5. Relationship terms (English, Tanglish, Sinhala) with plurals/possessives
+  const relationships = /\b(?:father's|fathers|father|dad's|dads|dad|thaththa|thaththata|පියා|තාත්තා|තාත්තට|mother's|mothers|mother|mom's|moms|mom|amma|ammata|අම්මා|අම්මට|පියාණන්|පියාණන්ට|brother's|brothers|brother|malli|ayiya|mallita|ayyata|මල්ලි|අයියා|sister's|sisters|sister|nangi|akka|nangita|akkata|නංගි|අක්කා|friend's|friends|friend|yaluwa|yaluwata|මිතුරා|යාලුවා|partner's|partners|partner|love's|loves|love|husband's|husbands|husband|wife's|wives|wife|gf|bf|sudoo|බිරිඳ|සැමියා|ආදරණීයයා)\b/gi;
+  cleaned = cleaned.replace(relationships, '');
+
+  // 6. Occasion terms (English, Tanglish, Sinhala) with plurals/possessives
+  const occasions = /\b(?:birthday's|birthdays|birthday|bday|upandinaya|updandinaya|upadinaya|updandinayata|upandinayata|upadinayata|උපන්දිනය|උපන්දින|anniversary's|anniversaries|anniversary|wedding's|weddings|wedding|සංවත්සරය|anniversariya|retirement's|retirements|retirement|විශ්‍රාම|graduation's|graduations|graduation|උපාධි|valentines|valentine|christmas)\b/gi;
+  cleaned = cleaned.replace(occasions, '');
+
+  // 7. Pronominal/prepositional noise
+  const noise = /\b(?:for my|for|to my|to|my|it is for|on our|for our|on my|for my|our memory is|memory of|memories are|memories of|මට|මගේ|ඔබට|ඔයාට|සුබ|සුභ|wewa|වේවා)\b/gi;
+  cleaned = cleaned.replace(noise, '');
 
   // Remove punctuation and extra whitespace
   cleaned = cleaned.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'’]/g, '');
@@ -639,8 +730,8 @@ export function extractCustomMemories(query: string, relationship?: string | nul
     return null;
   }
 
-  // Bilingual filter: Strip shopping/product/action terms and common stop words to check if any actual anecdote remains
-  let checkMemory = cleaned.replace(/(?:cake|keik|කේක්|flower|mal|මල්|rose|rosa|රෝස|chocolate|චොකලට්|recommend|suggest|නිර්දේශ|search|find|සොයන්න|order|ඇණවුම්|buy|මිලදී|show|පෙන්වන්න|add|cart|කාර්ට්|delivery|බෙදාහැරීමේ|rate|price|cost|මිල|ගාස්තු|how\s*much|keeyada|kiyada)/gi, '');
+  // Bilingual filter: Strip common stop words to check if any actual anecdote remains
+  let checkMemory = cleaned;
   const stopWordsPattern = /\b(?:i|a|an|the|and|or|but|if|then|else|me|you|we|he|she|it|they|us|him|her|them|my|your|his|her|its|our|their|mine|yours|ours|theirs|to|for|in|on|at|with|about|against|between|into|through|during|before|after|above|below|from|up|down|in|out|off|over|under|again|further|then|once|here|there|when|where|why|how|all|any|both|each|few|more|most|other|some|such|no|nor|not|only|own|same|so|than|too|very|s|t|can|will|just|don|should|now|is|am|are|was|were|be|been|being|have|has|had|having|do|does|did|doing|please|would|could|should|shall|must|may|might|mama|mage|mata|oba|obage|obata|oya|oyage|oyata|apa|ape|apata|eya|saha|ho|sadhaha|wetha|karunakara|puluwan|one|oni|atha|natha|na|naha|මම|මගේ|මට|ඔබ|ඔබේ|ඔබට|ඔයා|ඔයාගේ|ඔයාට|අප|අපේ|අපට|එය|එහි|සහ|හෝ|සඳහා|වෙත|කරුණාකර|පුළුවන්|ඕනෑ|ඇත|නැත)\b/gi;
   checkMemory = checkMemory.replace(stopWordsPattern, '');
   checkMemory = checkMemory.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'’]/g, '');
@@ -650,17 +741,39 @@ export function extractCustomMemories(query: string, relationship?: string | nul
     return null;
   }
 
-  // Otherwise, return the original text but clean up some greeting commands from it so it reads as a memory
+  // Otherwise, return the cleaned original text (with shopping, relationship, occasion, name details stripped) so it reads as a memory
   let originalCleaned = query;
-  const commandPattern = /(?:compose|write|generate|greeting|message|note|card|text for the card|text for card|card text|wording|words|wachana\s+one|wachana\s+oni)/gi;
-  originalCleaned = originalCleaned.replace(commandPattern, '');
   
+  // Clean all these patterns from the final returned memory string:
+  originalCleaned = originalCleaned.replace(shoppingActions, '');
+  originalCleaned = originalCleaned.replace(productCategories, '');
+  originalCleaned = originalCleaned.replace(nicknamePhrases, '');
+  for (const nameWord of namesToStrip) {
+    const escaped = nameWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nameRegex = new RegExp(`\\b${escaped}\\b`, 'gi');
+    originalCleaned = originalCleaned.replace(nameRegex, '');
+  }
+
   // Clean relationship & occasion context
   const contextPattern = /(?:for my|for|to my|to|my)\s+(?:boyfriend's|girlfriend's|mother's|father's|mom's|dad's|brother's|sister's|husband's|wife's|boyfriend|girlfriend|mother|father|mom|dad|brother|sister|husband|wife|partner|friend|love)\s+(?:birthday|anniversary|wedding|retirement|special day)?/gi;
   originalCleaned = originalCleaned.replace(contextPattern, '');
   originalCleaned = originalCleaned.replace(/(?:it is for|on our|for our|on my|for my)\s+(?:birthday|anniversary|wedding|retirement)/gi, '');
-  
+  originalCleaned = originalCleaned.replace(relationships, '');
+  originalCleaned = originalCleaned.replace(occasions, '');
+  originalCleaned = originalCleaned.replace(noise, '');
+
   originalCleaned = originalCleaned.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'’]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Strip leading/trailing stop words and prepositions from the final memory text (excluding pronouns)
+  const cleanStopWords = ['and', 'or', 'but', 'if', 'then', 'else', 'to', 'for', 'in', 'on', 'at', 'with', 'from', 'of', 'about', 'a', 'an', 'the', 'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being', 'has', 'had', 'have', 'do', 'does', 'did', 'please', 's', 't'];
+  let words = originalCleaned.split(/\s+/);
+  while (words.length > 0 && cleanStopWords.includes(words[0].toLowerCase())) {
+    words.shift();
+  }
+  while (words.length > 0 && cleanStopWords.includes(words[words.length - 1].toLowerCase())) {
+    words.pop();
+  }
+  originalCleaned = words.join(' ');
 
   return originalCleaned || null;
 }

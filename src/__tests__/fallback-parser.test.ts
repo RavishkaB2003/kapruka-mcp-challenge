@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { localFallbackParse } from '../lib/gifting-helpers';
+import { localFallbackParse, extractCustomMemories } from '../lib/gifting-helpers';
 
 describe('localFallbackParse intent parsing', () => {
   it('correctly maps compose_greeting intent patterns', () => {
@@ -76,5 +76,24 @@ describe('localFallbackParse intent parsing', () => {
     expect(res.extractedCriteria.city).toBe('Negombo');
     expect(res.conversationalReply).toContain('මීගමුව');
     expect(res.conversationalReply).toContain('බෙදා හැරීමේ ගාස්තු');
+  });
+
+  it('extractCustomMemories returns null when no anecdote is present, even with name/nickname and shopping details', () => {
+    const query = 'i want a cake and a greeting card for my dads birthday. his name is hasitha and we call him Hasiya recommend me a cake';
+    const memory = extractCustomMemories(query, 'father', 'birthday', 'Hasiya');
+    expect(memory).toBeNull();
+  });
+
+  it('extractCustomMemories extracts clean anecdote when present, filtering out name/nickname and shopping phrases', () => {
+    const query = 'i want a cake and a greeting card for my dads birthday. his name is hasitha. we always went fishing together when I was young. recommend me a cake';
+    const memory = extractCustomMemories(query, 'father', 'birthday', 'hasitha');
+    expect(memory).toBe('we always went fishing together when I was young');
+  });
+
+  it('localFallbackParse extracts recipientName and passes it to customMemory extraction', () => {
+    const query = 'write a card for my dad birthday his name is hasitha and we call him Hasiya';
+    const res = localFallbackParse(query);
+    expect(res.widgetData.recipientName).toBe('Hasiya');
+    expect(res.widgetData.customMemory).toBeNull(); // name/nickname details should not leak into customMemory
   });
 });

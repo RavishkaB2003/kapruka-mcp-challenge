@@ -210,8 +210,8 @@ Interpret the user message and return a JSON object adhering strictly to the fol
     "occasion": "occasion name if recommend or compose_greeting intent (e.g. Birthday, Anniversary)",
     "tone": "tone for greeting (e.g. romantic, humorous, poetic, formal, warm)",
     "relationship": "relationship type (e.g. boyfriend, father, mother, friend)",
-    "customMemory": "any specific personal memory, nickname, inside joke, or anecdote mentioned by the user to include in the card (e.g. 'we always ate chocolate cake together', or null if none mentioned)",
-    "recipientName": "the name or nickname of the recipient if mentioned in the query, otherwise null"
+    "customMemory": "any specific personal memory, inside joke, or shared anecdote mentioned by the user to include in the card (e.g. 'we always ate chocolate cake together', or null if none mentioned). Do NOT extract recipient names, nicknames, relationship terms, or gifting/shopping actions here; extract names/nicknames to 'recipientName' instead.",
+    "recipientName": "the name or nickname of the recipient if mentioned in the query (e.g. 'hasitha', 'Hasiya', or 'John'), otherwise null"
   },
   "conversationalReply": "a warm, natural, premium reply stating what you found. Keep it concise. ${isSinhala ? 'Write the conversationalReply in natural, premium Sinhala Unicode.' : 'Write the conversationalReply in English.'}"
 }

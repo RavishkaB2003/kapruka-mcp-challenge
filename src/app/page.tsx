@@ -862,12 +862,24 @@ export default function Home() {
         occasion = occasion || 'special day';
         const tone = chatContext.tone || (textLower.includes('romantic') ? 'romantic' : textLower.includes('funny') || textLower.includes('humorous') ? 'funny' : 'warm');
 
+        // Extract recipient name if mentioned
+        let extractedRecName = prefilledRecipient?.name || null;
+        const nameRegex = /(?:name is|name:|recipient is|recipient name is|for)\s+([a-z]+(?:\s+[a-z]+)?)/i;
+        const nameM = userText.match(nameRegex);
+        if (nameM) {
+          const relationWords = ['boyfriend', 'girlfriend', 'husband', 'wife', 'dad', 'mom', 'father', 'mother', 'friend', 'someone', 'partner'];
+          const matchedName = nameM[1].trim();
+          if (!relationWords.includes(matchedName.toLowerCase())) {
+            extractedRecName = matchedName;
+          }
+        }
+
         // Extract custom memories and avoid placeholders
-        const memories = extractCustomMemories(userText, relationship, occasion);
+        const memories = extractCustomMemories(userText, relationship, occasion, extractedRecName);
 
         setChatContext(null);
 
-        const greetings = generateGreetings(relationship, occasion, tone, memories, activeLang === 'si');
+        const greetings = generateGreetings(relationship, occasion, tone, memories, activeLang === 'si', extractedRecName);
 
         widgetPayload = {
           type: 'compose_greeting',
@@ -955,9 +967,9 @@ export default function Home() {
         }
 
         // Sync prefilled recipient details if extracted from chat
-        if (widgetData?.recipientDetails) {
+        if (widgetData) {
           setPrefilledRecipient((prev) => ({
-            name: widgetData.recipientDetails?.name || prev?.name || null,
+            name: widgetData.recipientDetails?.name || widgetData.recipientName || prev?.name || null,
             address: widgetData.recipientDetails?.address || prev?.address || null,
             phone: widgetData.recipientDetails?.phone || prev?.phone || null
           }));
@@ -1169,9 +1181,11 @@ export default function Home() {
               const relationship = widgetData?.relationship || 'friend';
               const occasion = widgetData?.occasion || 'birthday';
 
-              // Extract custom memories and avoid placeholders
-              const memories = widgetData?.customMemory || extractCustomMemories(userText, relationship, occasion);
-              const greetings = generateGreetings(relationship, occasion, tone, memories, activeLang === 'si');
+              // Use memory extracted by Gemini if available (even if null), otherwise fallback to local regex helper
+              const memories = widgetData && widgetData.customMemory !== undefined
+                ? widgetData.customMemory
+                : extractCustomMemories(userText, relationship, occasion, widgetData?.recipientName);
+              const greetings = generateGreetings(relationship, occasion, tone, memories, activeLang === 'si', widgetData?.recipientName);
 
               widgetsArray.push({
                 type: 'compose_greeting',

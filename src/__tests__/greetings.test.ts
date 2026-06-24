@@ -33,4 +33,17 @@ describe('generateGreetings helper', () => {
     expect(greetings).toHaveLength(3);
     expect(greetings[0]).toContain('Sending you this special gift, Friend');
   });
+
+  it('generates greetings using recipientName when provided', () => {
+    const greetings = generateGreetings('Father', 'birthday', 'warm', null, false, 'Hasiya');
+    expect(greetings).toHaveLength(3);
+    expect(greetings[0]).toContain('Happy Birthday, Hasiya!');
+    expect(greetings[1]).toContain('To the best Father in the world');
+  });
+
+  it('generates Sinhala greetings using recipientName when provided for partner', () => {
+    const greetings = generateGreetings('Partner', 'birthday', 'warm', null, true, 'සඳූ');
+    expect(greetings).toHaveLength(3);
+    expect(greetings[0]).toContain('මගේ ආදරණීය සඳූ වෙත');
+  });
 });
