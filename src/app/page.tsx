@@ -2211,8 +2211,8 @@ export default function Home() {
                             transition={{ delay: isWorkspaceActive ? 0.3 : 0, duration: 0.8, ease: "easeOut" }}
                             className="max-w-md space-y-3 mt-auto mb-6 pointer-events-none"
                           >
-                            <span className="inline-flex items-center gap-1.5 bg-terracotta/20 border border-terracotta/40 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider text-terracotta">
-                              <Sparkles className="h-3 w-3" /> Conversational Gifting
+                            <span className="inline-flex items-center gap-1.5 bg-slate-black/75 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider text-orange-200">
+                              <Sparkles className="h-3 w-3 text-terracotta" /> Conversational Gifting
                             </span>
                             <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-tight">
                               Gifting Joy, Delivered Home.
