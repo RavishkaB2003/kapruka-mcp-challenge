@@ -403,7 +403,7 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     extractedPhone = phoneM[0];
   }
 
-  const addressRegex = /(?:address is|address:|deliver to|delivery address:)\s+([^,.\n]+)/i;
+  const addressRegex = /(?:address is|address:|delivery address:)\s+([^,.\n]+)/i;
   const addressM = query.match(addressRegex);
   if (addressM) {
     extractedAddress = addressM[1].trim();

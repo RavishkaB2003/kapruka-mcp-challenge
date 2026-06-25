@@ -1497,6 +1497,7 @@ export default function Home() {
     // Clear cart locally but keep state until starting a new order
     saveCart([]);
     saveGiftMessage('');
+    setPrefilledRecipient(null);
 
     setTimeout(() => {
       scrollToSection(4);
@@ -1530,6 +1531,7 @@ export default function Home() {
     setView('browse');
     setSelectedProduct(null);
     saveCart([]);
+    setPrefilledRecipient(null);
     setTimeout(() => {
       scrollToSection(2);
     }, 100);
