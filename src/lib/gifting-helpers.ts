@@ -343,9 +343,18 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     recipientName: string | null;
   };
   conversationalReply: string;
+  greetingOptions: string[] | null;
+  isAi: boolean;
 } {
   const q = query.toLowerCase();
   
+  const bereavementKeywords = [
+    'lost', 'passed away', 'death', 'die', 'died', 'funeral', 'condolences', 'grief', 
+    'merila', 'nathi wela', 'nathi-wela', 'nathiwela', 'malagedara', 'mala gedara', 'funeral-ekak', 'funeral ekak', 'awalathawaka',
+    'නැතිවුණා', 'මියගියා', 'මරණය', 'අවමංගල්‍ය', 'මළගෙදර', 'නිවන් සුව'
+  ];
+  const isBereavement = bereavementKeywords.some(keyword => q.includes(keyword));
+
   // Multiple intent detection for local parser
   const intents: ('search' | 'check_delivery' | 'track_order' | 'get_product_info' | 'general' | 'add_to_cart' | 'recommend' | 'compose_greeting')[] = [];
   const isGreetingQuery = q.includes('write') || q.includes('compose') || q.includes('message') || q.includes('note') || q.includes('greeting') || q.includes('card') || q.includes('text') || q.includes('wachana') || q.includes('wording');
@@ -356,13 +365,15 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   if (q.includes('add') && (q.includes('cart') || q.includes('basket'))) {
     intents.push('add_to_cart');
   }
-  if (q.includes('recommend') || q.includes('suggest') || q.includes('gift idea') || q.includes('birthday') || q.includes('anniversary') || q.includes('occasion')) {
+  if (isBereavement || q.includes('recommend') || q.includes('suggest') || q.includes('gift idea') || q.includes('birthday') || q.includes('anniversary') || q.includes('occasion') ||
+      q.includes('upandinay') || q.includes('upadinay') || q.includes('උපන්දිනය') || q.includes('updandina') || q.includes('සංවත්සරය') || q.includes('anniversariya') ||
+      q.includes('yawanna') || q.includes('yavanna') || q.includes('yawata') || q.includes('තෑග්ගක්') || q.includes('තෑගි') || q.includes('තෝර') || q.includes('thor')) {
     intents.push('recommend');
   }
   if (q.includes('track') || q.includes('where is') || q.includes('ord-') || q.includes('taththata yawwa')) {
     intents.push('track_order');
   }
-  if (q.includes('deliver') || q.includes('rate') || q.includes('open da') || q.includes('fee')) {
+  if (q.includes('deliver') || q.includes('rate') || q.includes('open da') || /\bfee\b/.test(q)) {
     intents.push('check_delivery');
   }
   if (q.includes('eggless') || q.includes('ingredient') || q.includes('allergen') || q.includes('size') || q.includes('weight')) {
@@ -390,7 +401,11 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   let giftType = 'Gifts';
 
   // Category mapping
-  if (q.includes('cake') || q.includes('කේක්') || q.includes('keik') || q.includes('kake') || q.includes('kek')) {
+  if (isBereavement) {
+    detectedCategory = 'flowers';
+    cleanSearchTerm = 'sympathy flowers';
+    giftType = 'Flowers';
+  } else if (q.includes('cake') || q.includes('කේක්') || q.includes('keik') || q.includes('kake') || q.includes('kek')) {
     detectedCategory = 'cakes';
     cleanSearchTerm = 'cake';
     giftType = 'Cakes';
@@ -424,23 +439,29 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   let recipient = 'Someone Special';
   let relationship = null;
   if (q.includes('mom') || q.includes('mother') || q.includes('amma') || q.includes('ammata') || q.includes('ammatath') || q.includes('අම්මා') || q.includes('අම්මට') || q.includes('මව') || q.includes('මවට')) {
-    recipient = 'Mother';
+    recipient = 'Mom';
     relationship = 'mother';
   } else if (q.includes('dad') || q.includes('father') || q.includes('thaththa') || q.includes('thaththata') || q.includes('තාත්තා') || q.includes('තාත්තට') || q.includes('පියා') || q.includes('පියට') || q.includes('පියාණන්') || q.includes('පියාණන්ට')) {
-    recipient = 'Father';
+    recipient = 'Dad';
     relationship = 'father';
+  } else if (q.includes('gf') || q.includes('bf') || q.includes('wife') || q.includes('husband') || q.includes('baba') || q.includes('sudoo') || q.includes('love') || q.includes('boyfriend') || q.includes('girlfriend') || q.includes('girlfirend') || q.includes('boyfirend') || q.includes('බිරිඳ') || q.includes('බිරිඳට') || q.includes('සැමියා') || q.includes('සැමියට') || q.includes('ආදරවන්තයා') || q.includes('ආදරවන්තී') || q.includes('සුදූ') || q.includes('වයිෆ්') || q.includes('හස්බන්ඩ්')) {
+    recipient = 'Lover';
+    relationship = 'lover';
   } else if (q.includes('malli') || q.includes('brother') || q.includes('bro') || q.includes('mallita') || q.includes('ayiya') || q.includes('ayyata') || q.includes('මල්ලි') || q.includes('මල්ලිට') || q.includes('අයියා') || q.includes('අයියට') || q.includes('සහෝදරයා') || q.includes('සහෝදරයට')) {
-    recipient = 'Brother';
+    recipient = 'Someone Special';
     relationship = 'brother';
   } else if (q.includes('nangi') || q.includes('sister') || q.includes('sis') || q.includes('nangita') || q.includes('akka') || q.includes('akkata') || q.includes('නංගි') || q.includes('නංගිට') || q.includes('අක්කා') || q.includes('අක්කට') || q.includes('සහෝදරිය') || q.includes('සහෝදරියට')) {
-    recipient = 'Sister';
+    recipient = 'Someone Special';
     relationship = 'sister';
-  } else if (q.includes('friend') || q.includes('yaluwa') || q.includes('yaluwata') || q.includes('fit-eka') || q.includes('යාලුවා') || q.includes('යාලුවට') || q.includes('මිතුරා') || q.includes('මිතුරට') || q.includes('හිතවතා') || q.includes('හිතවතෙක්') || q.includes('ෆිට්') || q.includes('මචං')) {
+  } else if (q.includes('friend') || q.includes('yaluwa') || q.includes('yaluwata') || q.includes('fit-eka') || q.includes('යාලුවා') || q.includes('යාලුවට') || q.includes('මිතුරා') || q.includes('මිතුරට') || q.includes('හිතවතා') || q.includes('හිතවතෙක්') || q.includes('ෆිට්') || q.includes('මචං') || q.includes('firend')) {
     recipient = 'Friend';
     relationship = 'friend';
-  } else if (q.includes('gf') || q.includes('bf') || q.includes('wife') || q.includes('husband') || q.includes('baba') || q.includes('sudoo') || q.includes('love') || q.includes('boyfriend') || q.includes('girlfriend') || q.includes('බිරිඳ') || q.includes('බිරිඳට') || q.includes('සැමියා') || q.includes('සැමියට') || q.includes('ආදරවන්තයා') || q.includes('ආදරවන්තී') || q.includes('සුදූ') || q.includes('වයිෆ්') || q.includes('හස්බන්ඩ්')) {
-    recipient = 'Partner';
-    relationship = 'partner';
+  }
+
+  if (isBereavement) {
+    if (recipient !== 'Mom' && recipient !== 'Dad') {
+      recipient = 'Someone Special';
+    }
   }
 
   // Basic occasion extraction (English, Sinhala Unicode, and Tanglish)
@@ -589,18 +610,21 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   }
 
   let conversationalReply = city
-    ? `Found some premium options deliverable to ${city} for ${recipient}. Renders are loaded on the visual layout.`
-    : `Found some premium options for ${recipient}. Renders are loaded on the visual layout. Please select a delivery city and date on the right to verify availability.`;
+    ? `Found some premium options deliverable to ${city} for ${recipient}. Renders are loaded on the visual layout. 🎁`
+    : `Found some premium options for ${recipient}. Renders are loaded on the visual layout. Please select a delivery city and date on the right to verify availability. 🌸`;
 
   if (isSinhala) {
     const recipientSinhala: Record<string, string> = {
+      'Mom': 'අම්මා',
+      'Dad': 'තාත්තා',
+      'Lover': 'ආදරණීයයා',
+      'Friend': 'මිතුරා',
+      'Someone Special': 'විශේෂ කෙනෙකු',
       'Mother': 'අම්මා',
       'Father': 'තාත්තා',
-      'Brother': 'මල්ලි/අයියා',
-      'Sister': 'නංගි/අක්කා',
-      'Friend': 'මිතුරා',
       'Partner': 'ආදරණීයයා',
-      'Someone Special': 'විශේෂ කෙනෙකු'
+      'Brother': 'මල්ලි/අයියා',
+      'Sister': 'නංගි/අක්කා'
     };
     const citySinhala: Record<string, string> = {
       'Colombo': 'කොළඹ',
@@ -623,8 +647,8 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     const catDisplay = categorySinhala[detectedCategory] || 'තෑගි';
 
     conversationalReply = cityDisplay
-      ? `${recDisplay} සඳහා ${cityDisplay} වෙත බෙදා හැරිය හැකි ප්‍රිමියම් ${catDisplay} වර්ග කිහිපයක් මෙන්න. විස්තර පහතින් බලාගත හැක.`
-      : `${recDisplay} සඳහා ප්‍රිමියම් ${catDisplay} වර්ග කිහිපයක් මෙන්න. බෙදා හැරීමේ හැකියාව බැලීමට කරුණාකර දකුණු පසින් නගරය සහ දිනය තෝරන්න.`;
+      ? `${recDisplay} සඳහා ${cityDisplay} වෙත බෙදා හැරිය හැකි ප්‍රිමියම් ${catDisplay} වර්ග කිහිපයක් මෙන්න. විස්තර පහතින් බලාගත හැක. 🌸`
+      : `${recDisplay} සඳහා ප්‍රිමියම් ${catDisplay} වර්ග කිහිපයක් මෙන්න. බෙදා හැරීමේ හැකියාව බැලීමට කරුණාකර දකුණු පසින් නගරය සහ දිනය තෝරන්න. 🎁`;
 
     if (detectedIntent === 'track_order') {
       conversationalReply = orderNumber 
@@ -636,15 +660,28 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
       conversationalReply = `භාණ්ඩයේ විස්තර ඔබ වෙනුවෙන් පරීක්ෂා කරමින් පවතී.`;
     } else if (detectedIntent === 'add_to_cart') {
       const prodNameDisplay = productName || catDisplay;
-      conversationalReply = `${prodNameDisplay} ඔබගේ කාර්ට් එකට එකතු කරමින් පවතී...`;
+      conversationalReply = `නියම තේරීමක්! 🛒 මම ${prodNameDisplay} ඉක්මනින්ම ඔබගේ කාර්ට් එකට එකතු කරනවා...`;
     } else if (detectedIntent === 'recommend') {
-      const relDisplay = relationship ? (recipientSinhala[relationship] || relationship) : 'ආදරණීයයා';
-      const occDisplay = occasion === 'Birthday' ? 'උපන්දිනය' : (occasion === 'Anniversary' ? 'විවාහ සංවත්සරය' : 'විශේෂ අවස්ථාව');
-      conversationalReply = `ඔබගේ ${relDisplay} ගේ ${occDisplay} සඳහා නිර්දේශ කිහිපයක් මෙන්න.`;
+      const relDisplay = relationship ? (recipientSinhala[relationship] || relationship) : 'විශේෂ කෙනෙකු';
+      const isForgot = q.includes('forgot') || q.includes('forget') || q.includes('forgotten') || q.includes('late') || q.includes('amatauna') || q.includes('mathaka na') || q.includes('පරක්කු') || q.includes('අමතක');
+      const isBreakup = q.includes('broke up') || q.includes('sorry') || q.includes('sad') || q.includes('cry') || q.includes('bad') || q.includes('bela') || q.includes('apology') || q.includes('තරහ වෙලා') || q.includes('රණ්ඩු') || q.includes('සමාවෙන්න') || q.includes('break up') || q.includes('breakup');
+      const isSick = q.includes('sick') || q.includes('hospital') || q.includes('ill') || q.includes('not well') || q.includes('ලෙඩ') || q.includes('සනීප නැති');
+
+      if (isBereavement) {
+        conversationalReply = `ඔබට සිදු වූ මෙම වියෝව පිළිබඳව මගේ බලවත් කණගාටුව ප්‍රකාශ කර සිටිනවා. 🤍 මෙවැනි දුෂ්කර මොහොතක, ශෝකය ප්‍රකාශ කිරීම සඳහා සුදුසු සුදු මල් බූකේ එකක් හෝ නැවුම් පලතුරු වට්ටියක් යැවීම වඩාත් උචිත වේ. මම ඒ සඳහා සුදුසු තේරීම් කිහිපයක් මෙහි දක්වා ඇත:`;
+      } else if (isForgot) {
+        conversationalReply = `අයියෝ! 💔 බය වෙන්න එපා — මම ඔයාට උදව් කරන්නම්! අපි මේක ඉක්මනටම ලස්සනට සූදානම් කරමු. බෙදා හැරිය හැකි හොඳම තෑගි නිර්දේශ කිහිපයක් මෙන්න: 🌸`;
+      } else if (isBreakup) {
+        conversationalReply = `අයියෝ! 💔 කමක් නැහැ — මෙන්න මෙහෙම කරමු. මම මල් ටික ඔයාට එවන්නම්, ඔයාම ගිහින් එයාට දෙන්න. ඒක ඩිලිවරි යවනවට වඩා ගොඩක් වටිනවා. අපි ලස්සන කාඩ් එකකුත් ලියමුද? මෙන්න තේරීම්: 🌹`;
+      } else if (isSick) {
+        conversationalReply = `අයියෝ, එයාට සනීප නැහැ කිව්ව එකට මට කණගාටුයි. 🥺 එයාට ඉක්මන් සුවය පතා යවන්න සුදුසු නැවුම් පලතුරු හෝ මල් වට්ටි කිහිපයක් මෙන්න: 🍇`;
+      } else {
+        conversationalReply = `ආදරයෙන් දෙන තෑග්ගක් හැමදාම වටිනවා! 😊 ඔයාගේ ${relDisplay} වෙනුවෙන්ම මම තෝරපු හොඳම නිර්දේශ කිහිපයක් මෙන්න:`;
+      }
     } else if (detectedIntent === 'compose_greeting') {
-      conversationalReply = `ඔබ වෙනුවෙන් සුබපැතුම් පතක් සූදානම් කරමින් පවතී...`;
+      conversationalReply = `ලස්සන සුබපැතුම් කාඩ්පතක් ලියන එක මම ආසම වැඩක්! ✍️ ඔයා වෙනුවෙන්ම ලස්සන වදන් කිහිපයක් සූදානම් කරමින් පවතිනවා...`;
     } else if (detectedIntent === 'general') {
-      conversationalReply = "කප්රුක Gifting Concierge වෙත සාදරයෙන් පිළිගනිමු! 🌸 ඔබගේ ආදරණීයයන්ට තෑගි යැවීමට, ඩිලිවරි ගාස්තු පරීක්ෂා කිරීමට හෝ ඇණවුම් සොයා ගැනීමට මට උදව් කළ හැක. ඔබට කුමක් කිරීමටද අවශ්‍ය?";
+      conversationalReply = "ආයුබෝවන්! 🇱🇰 කප්රුක Gifting Concierge වෙත සාදරයෙන් පිළිගනිමු! 🌸 මම මෙතන ඉන්නේ ඔයාගේ ආදරණීයයන්ට හොඳම තෑග්ග තෝරන්න, ඩිලිවරි ගාස්තු බලන්න, ලස්සන සුබපැතුම් ලියන්න, නැත්නම් ඕඩර් එක ට්‍රැක් කරන්න උදව් කරන්නයි. අද අපි කාටද තෑග්ගක් යවන්නේ?";
     }
   } else {
     if (detectedIntent === 'track_order') {
@@ -656,13 +693,27 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     } else if (detectedIntent === 'get_product_info') {
       conversationalReply = `Checking product details for you.`;
     } else if (detectedIntent === 'add_to_cart') {
-      conversationalReply = `Adding ${productName || 'product'} to your cart...`;
+      conversationalReply = `Excellent choice! 🛒 Adding ${productName || 'your gift'} to your cart right now...`;
     } else if (detectedIntent === 'recommend') {
-      conversationalReply = `Here are some recommendations for your ${relationship || 'recipient'}'s ${occasion || 'birthday'}.`;
+      const isForgot = q.includes('forgot') || q.includes('forget') || q.includes('forgotten') || q.includes('late') || q.includes('amatauna') || q.includes('mathaka na') || q.includes('පරක්කු') || q.includes('අමතක');
+      const isBreakup = q.includes('broke up') || q.includes('sorry') || q.includes('sad') || q.includes('cry') || q.includes('bad') || q.includes('bela') || q.includes('apology') || q.includes('තරහ වෙලා') || q.includes('රණ්ඩු') || q.includes('සමාවෙන්න') || q.includes('break up') || q.includes('breakup');
+      const isSick = q.includes('sick') || q.includes('hospital') || q.includes('ill') || q.includes('not well') || q.includes('ලෙඩ') || q.includes('සනීප නැති');
+
+      if (isBereavement) {
+        conversationalReply = `I am so incredibly sorry for your loss. 🤍 During such a difficult time, sending sympathy flowers (like white lilies) or a comforting fruit basket is a thoughtful way to express condolences. Here are some gentle options to show you care:`;
+      } else if (isForgot) {
+        conversationalReply = `Aiyo! 💔 Don't panic — I've got your back! Let's get this sorted out right away. Here are some gorgeous options that can be delivered fresh to save the day: 🌸`;
+      } else if (isBreakup) {
+        conversationalReply = `Aiyo! 💔 Okay — here's the plan. I'll get the flowers to you, and you hand-deliver them. Trust me, that lands better than a courier. Shall I add a note card too? Here are some options: 🌹`;
+      } else if (isSick) {
+        conversationalReply = `Oh, I'm so sorry to hear they are not feeling well. 🥺 Sending some fresh flowers or a healthy fruit basket is a wonderful way to brighten their day. Here are some options: 🍇`;
+      } else {
+        conversationalReply = `A gift selected with love always makes them smile! 😊 Here are some premium options I've picked out for your ${relationship || 'special someone'}:`;
+      }
     } else if (detectedIntent === 'compose_greeting') {
-      conversationalReply = `Generating gift note options for you...`;
+      conversationalReply = `Writing a beautiful note is my favorite part! ✍️ I'm crafting some warm greeting options for you...`;
     } else if (detectedIntent === 'general') {
-      conversationalReply = "Welcome to the Kapruka Gifting Concierge! 🌸 I am here to help you find the perfect gift, check delivery rates, compose greeting notes, or track your order. What would you like to do? You can try asking: \"Recommend a cake for my Father's birthday\" or \"Compose a greeting note\".";
+      conversationalReply = "Ayubowan! 🇱🇰 Welcome to Kapruka Gifting! I'm your Gifting Concierge. 🌸 I'm here to help you pick the perfect gifts, check delivery rates, write heartfelt greeting notes, or track your order. Let's make someone special smile today! What can I do for you?";
     }
   }
 
@@ -694,7 +745,9 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
       customMemory: extractCustomMemories(query, relationship, occasion, extractedName),
       recipientName: extractedName || (relationship ? relationship : null)
     },
-    conversationalReply
+    conversationalReply,
+    greetingOptions: null,
+    isAi: false
   };
 }
 

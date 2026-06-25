@@ -169,11 +169,12 @@ function GiftingImage({ src, alt, fill, sizes, className, category }: {
 
 const mapRecipientToDropdown = (rec: string): string => {
   if (!rec) return 'Someone Special';
+  if (['Mom', 'Dad', 'Lover', 'Friend', 'Someone Special'].includes(rec)) return rec;
   const r = rec.toLowerCase();
   if (r.includes('father') || r.includes('dad') || r.includes('thaththa')) return 'Dad';
   if (r.includes('mother') || r.includes('mom') || r.includes('amma')) return 'Mom';
-  if (r.includes('partner') || r.includes('love') || r.includes('lover') || r.includes('husband') || r.includes('wife') || r.includes('gf') || r.includes('bf')) return 'Lover';
-  if (r.includes('friend') || r.includes('yaluwa')) return 'Friend';
+  if (r.includes('partner') || r.includes('love') || r.includes('lover') || r.includes('husband') || r.includes('wife') || r.includes('gf') || r.includes('bf') || r.includes('girlfriend') || r.includes('boyfriend')) return 'Lover';
+  if (r.includes('friend') || r.includes('yaluwa') || r.includes('firend')) return 'Friend';
   return 'Someone Special';
 };
 
@@ -520,7 +521,7 @@ export default function Home() {
     setMessages([
       {
         sender: 'ai',
-        text: 'Ayubowan! 🇱🇰 Welcome to Kapruka Gifting. I am your premium Gifting Concierge. How can I help you make someone special smile today?\n\n💡 Try asking:\n• "Send a Chocolate fudge cake to Galle"\n• "Recommend one for me" (Let me pick the perfect gift for you!)\n• "Check if we deliver flowers to Galle on Sunday"\n• "Track my order ORD-MOCK-123"',
+        text: "Ayubowan! 🇱🇰 Welcome to Kapruka Gifting! I'm your Gifting Concierge. 🌸 I'm here to help you pick the perfect gifts, check delivery rates, write heartfelt greeting notes, or track your order. Let's make someone special smile today! What can I do for you?",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ]);
@@ -806,18 +807,25 @@ export default function Home() {
 
       const recipientSiMap: Record<string, string> = {
         'Someone Special': 'විශේෂ කෙනෙකු',
+        'Mom': 'අම්මා',
+        'Dad': 'තාත්තා',
+        'Lover': 'ආදරණීයයා',
+        'Friend': 'මිතුරා',
+        'mom': 'අම්මා',
+        'dad': 'තාත්තා',
+        'lover': 'ආදරණීයයා',
+        'friend': 'මිතුරා',
+        'someone special': 'විශේෂ කෙනෙකු',
         'Mother': 'අම්මා',
         'Father': 'තාත්තා',
         'Partner': 'ආදරණීයයා',
         'Brother': 'මල්ලි/අයියා',
         'Sister': 'නංගි/අක්කා',
-        'Friend': 'මිතුරා',
         'mother': 'අම්මා',
         'father': 'තාත්තා',
         'partner': 'ආදරණීයයා',
         'brother': 'මල්ලි/අයියා',
         'sister': 'නංගි/අක්කා',
-        'friend': 'මිතුරා'
       };
 
       if (chatContext?.type === 'awaiting_recommendation_category') {
@@ -998,7 +1006,7 @@ export default function Home() {
 
         // 1. Process chat message using Gemini to extract intent & criteria
         const result = await processChatMessage(userText, activeLang === 'si', clientDateStr);
-        const { detectedIntent, detectedIntents, detectedCategory, cleanSearchTerm, requiresClarification, clarificationPrompt, extractedCriteria, widgetData, conversationalReply } = result;
+        const { detectedIntent, detectedIntents, detectedCategory, cleanSearchTerm, requiresClarification, clarificationPrompt, extractedCriteria, widgetData, conversationalReply, greetingOptions, isAi } = result;
 
         // Sync active category if found
         if (detectedCategory && detectedCategory !== 'all') {
@@ -1142,8 +1150,8 @@ export default function Home() {
                       : `\n\nI have prefilled these delivery details in your order form below. You can review them anytime!`;
                   }
                   
-                  if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                    accumulatedReply = successMsg + detailPrompt;
+                  if (accumulatedReply === conversationalReply) {
+                    accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${successMsg}${detailPrompt}` : successMsg + detailPrompt;
                   } else {
                     accumulatedReply += '\n\n' + successMsg + detailPrompt;
                   }
@@ -1152,8 +1160,8 @@ export default function Home() {
                     ? `"${product.name}" සොයා ගන්නා ලදී නමුත් ${citySiMap[city] || city} වෙත ${date} දින බෙදා හැරීම සිදු කළ නොහැක. (හේතුව: ${deliveryInfo.message})`
                     : `I found "${product.name}" but delivery is not available to ${city} on ${date}. Reason: ${deliveryInfo.message}`;
                   
-                  if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                    accumulatedReply = errMessage;
+                  if (accumulatedReply === conversationalReply) {
+                    accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${errMessage}` : errMessage;
                   } else {
                     accumulatedReply += '\n\n' + errMessage;
                   }
@@ -1163,8 +1171,8 @@ export default function Home() {
                   ? `"${prodQuery}" සඳහා ගැළපෙන නිෂ්පාදනයක් සෙවිය නොහැක. කරුණාකර ඔබ කැමති කේක්, මල් බූකේ, හෝ චොකලට් වර්ගය කුමක්දැයි පැහැදිලි කරන්න.`
                   : `I couldn't find a product matching "${prodQuery}" to add to your cart. Could you please specify which exact cake, chocolate, or flowers you would like to select?`;
                 
-                if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                  accumulatedReply = notFoundMsg;
+                if (accumulatedReply === conversationalReply) {
+                  accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${notFoundMsg}` : notFoundMsg;
                 } else {
                   accumulatedReply += '\n\n' + notFoundMsg;
                 }
@@ -1193,25 +1201,29 @@ export default function Home() {
                     }))
                   }
                 });
-                const relDisplay = widgetData?.relationship ? (recipientSiMap[widgetData.relationship] || widgetData.relationship) : 'විශේෂ කෙනෙකු';
-                const recMsg = activeLang === 'si'
-                  ? `ඔබගේ ${relDisplay} සඳහා වන නිර්දේශ කිහිපයක් මෙන්න. විස්තර පහතින් බලාගත හැක:`
-                  : `Based on your request for a ${widgetData?.relationship || 'special'} gift, I recommend these options. You can review and select them directly below:`;
-                
-                if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                  accumulatedReply = recMsg;
-                } else {
-                  accumulatedReply += '\n\n' + recMsg;
+                if (!isAi) {
+                  const relDisplay = widgetData?.relationship ? (recipientSiMap[widgetData.relationship] || widgetData.relationship) : 'විශේෂ කෙනෙකු';
+                  const recMsg = activeLang === 'si'
+                    ? `ඔබගේ ${relDisplay} සඳහා වන නිර්දේශ කිහිපයක් මෙන්න. විස්තර පහතින් බලාගත හැක:`
+                    : `Based on your request for a ${widgetData?.relationship || 'special'} gift, I recommend these options. You can review and select them directly below:`;
+                  
+                  if (accumulatedReply === conversationalReply) {
+                    accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${recMsg}` : recMsg;
+                  } else {
+                    accumulatedReply += '\n\n' + recMsg;
+                  }
                 }
               } else {
-                const noRecMsg = activeLang === 'si'
-                  ? `"${cleanSearchTerm}" සඳහා නිර්දේශ කිහිපයක් සෙවිය නොහැක. කරුණාකර කේක්, මල් බූකේ, හෝ චොකලට් වලින් කුමක් තෝරන්නේදැයි පවසන්න.`
-                  : `I couldn't find any specific catalog recommendations for "${cleanSearchTerm}". Could you please clarify if you prefer Cakes, Flowers, or Chocolates?`;
-                
-                if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                  accumulatedReply = noRecMsg;
-                } else {
-                  accumulatedReply += '\n\n' + noRecMsg;
+                if (!isAi) {
+                  const noRecMsg = activeLang === 'si'
+                    ? `"${cleanSearchTerm}" සඳහා නිර්දේශ කිහිපයක් සෙවිය නොහැක. කරුණාකර කේක්, මල් බූකේ, හෝ චොකලට් වලින් කුමක් තෝරන්නේදැයි පවසන්න.`
+                    : `I couldn't find any specific catalog recommendations for "${cleanSearchTerm}". Could you please clarify if you prefer Cakes, Flowers, or Chocolates?`;
+                  
+                  if (accumulatedReply === conversationalReply) {
+                    accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${noRecMsg}` : noRecMsg;
+                  } else {
+                    accumulatedReply += '\n\n' + noRecMsg;
+                  }
                 }
               }
 
@@ -1220,11 +1232,15 @@ export default function Home() {
               const relationship = widgetData?.relationship || 'friend';
               const occasion = widgetData?.occasion || 'birthday';
 
-              // Use memory extracted by Gemini if available (even if null), otherwise fallback to local regex helper
-              const memories = widgetData && widgetData.customMemory !== undefined
-                ? widgetData.customMemory
-                : extractCustomMemories(userText, relationship, occasion, widgetData?.recipientName);
-              const greetings = generateGreetings(relationship, occasion, tone, memories, activeLang === 'si', widgetData?.recipientName);
+              // If greetingOptions were pre-generated by Gemini, use them directly
+              const greetings = (isAi && greetingOptions && greetingOptions.length >= 3)
+                ? greetingOptions
+                : (() => {
+                    const memories = widgetData && widgetData.customMemory !== undefined
+                      ? widgetData.customMemory
+                      : extractCustomMemories(userText, relationship, occasion, widgetData?.recipientName);
+                    return generateGreetings(relationship, occasion, tone, memories, activeLang === 'si', widgetData?.recipientName);
+                  })();
 
               widgetsArray.push({
                 type: 'compose_greeting',
@@ -1235,14 +1251,17 @@ export default function Home() {
                   options: greetings
                 }
               });
-              const greetingMsg = activeLang === 'si'
-                ? `ඔබගේ ${relationship === 'father' ? 'තාත්තා' : relationship === 'mother' ? 'අම්මා' : relationship} ගේ ${occasion === 'birthday' ? 'උපන්දිනය' : 'විශේෂ දිනය'} වෙනුවෙන් මා සකස් කල සුබපැතුම් 3 මෙන්න. එය ඇතුලත් කිරීමට "Apply" ක්ලික් කරන්න!`
-                : `Here are 3 custom greeting note options I've written for your ${relationship}'s ${occasion}. Click "Apply" to copy it directly to your gift note!`;
 
-              if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                accumulatedReply = greetingMsg;
-              } else {
-                accumulatedReply += '\n\n' + greetingMsg;
+              if (!isAi) {
+                const greetingMsg = activeLang === 'si'
+                  ? `ඔබගේ ${relationship === 'father' ? 'තාත්තා' : relationship === 'mother' ? 'අම්මා' : relationship} ගේ ${occasion === 'birthday' ? 'උපන්දිනය' : 'විශේෂ දිනය'} වෙනුවෙන් මා සකස් කල සුබපැතුම් 3 මෙන්න. එය ඇතුලත් කිරීමට "Apply" ක්ලික් කරන්න!`
+                  : `Here are 3 custom greeting note options I've written for your ${relationship}'s ${occasion}. Click "Apply" to copy it directly to your gift note!`;
+
+                if (accumulatedReply === conversationalReply) {
+                  accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${greetingMsg}` : greetingMsg;
+                } else {
+                  accumulatedReply += '\n\n' + greetingMsg;
+                }
               }
 
             } else if (intent === 'check_delivery') {
@@ -1268,8 +1287,8 @@ export default function Home() {
                   ? `${citySiMap[city] || city} වෙත ${date} දින බෙදා හැරීම සිදු කළ නොහැක. (හේතුව: ${deliveryInfo.message})`
                   : `Delivery is not available to ${city} on ${date}. Reason: ${deliveryInfo.message}`);
               
-              if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                accumulatedReply = deliveryMsg;
+              if (accumulatedReply === conversationalReply) {
+                accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${deliveryMsg}` : deliveryMsg;
               } else {
                 accumulatedReply += '\n\n' + deliveryMsg;
               }
@@ -1305,8 +1324,8 @@ export default function Home() {
                 trackMsg = trackInfo.message || 'Verification failed.';
               }
 
-              if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                accumulatedReply = trackMsg;
+              if (accumulatedReply === conversationalReply) {
+                accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${trackMsg}` : trackMsg;
               } else {
                 accumulatedReply += '\n\n' + trackMsg;
               }
@@ -1335,24 +1354,28 @@ export default function Home() {
                   }
                 });
 
-                const infoMsg = activeLang === 'si'
-                  ? `"${matchedProduct.name}" සඳහා භාණ්ඩයේ විස්තර සහ අඩංගු ද්‍රව්‍ය සූදානම් කර ඇත.`
-                  : `Here are the product specifications and ingredients for "${matchedProduct.name}".`;
+                if (!isAi) {
+                  const infoMsg = activeLang === 'si'
+                    ? `"${matchedProduct.name}" සඳහා භාණ්ඩයේ විස්තර සහ අඩංගු ද්‍රව්‍ය සූදානම් කර ඇත.`
+                    : `Here are the product specifications and ingredients for "${matchedProduct.name}".`;
 
-                if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                  accumulatedReply = infoMsg;
-                } else {
-                  accumulatedReply += '\n\n' + infoMsg;
+                  if (accumulatedReply === conversationalReply) {
+                    accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${infoMsg}` : infoMsg;
+                  } else {
+                    accumulatedReply += '\n\n' + infoMsg;
+                  }
                 }
               } else {
-                const notFoundInfoMsg = activeLang === 'si'
-                  ? `"${productQuery}" සඳහා විස්තර සෙවිය නොහැක. වෙනත් භාණ්ඩයක් සඳහා විමසන්න.`
-                  : `I couldn't find details for a product matching "${productQuery}". Let me know if you would like me to search for another gift.`;
+                if (!isAi) {
+                  const notFoundInfoMsg = activeLang === 'si'
+                    ? `"${productQuery}" සඳහා විස්තර සෙවිය නොහැක. වෙනත් භාණ්ඩයක් සඳහා විමසන්න.`
+                    : `I couldn't find details for a product matching "${productQuery}". Let me know if you would like me to search for another gift.`;
 
-                if (accumulatedReply === conversationalReply || !accumulatedReply) {
-                  accumulatedReply = notFoundInfoMsg;
-                } else {
-                  accumulatedReply += '\n\n' + notFoundInfoMsg;
+                  if (accumulatedReply === conversationalReply) {
+                    accumulatedReply = conversationalReply ? `${conversationalReply}\n\n${notFoundInfoMsg}` : notFoundInfoMsg;
+                  } else {
+                    accumulatedReply += '\n\n' + notFoundInfoMsg;
+                  }
                 }
               }
             } else {
@@ -1362,6 +1385,22 @@ export default function Home() {
               setProducts(results);
               if (results && results.length > 0) {
                 setMobileActiveTab('shop');
+                widgetsArray.push({
+                  type: 'recommendations',
+                  data: {
+                    occasion: widgetData?.occasion || 'Special Celebration',
+                    products: results.slice(0, 3).map(p => ({
+                      id: p.id,
+                      name: p.name,
+                      price: p.price,
+                      image: p.image,
+                      stock: p.stock,
+                      weight: p.weight || '2.2 lbs (1.0 kg)',
+                      category: p.category,
+                      url: p.url
+                    }))
+                  }
+                });
               }
             }
           }

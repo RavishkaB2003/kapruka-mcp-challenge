@@ -34,7 +34,7 @@ describe('localFallbackParse intent parsing', () => {
 
   it('extracts recipient and relationship details', () => {
     const res = localFallbackParse('send a cake to my mother in Negombo');
-    expect(res.extractedCriteria.recipient).toBe('Mother');
+    expect(res.extractedCriteria.recipient).toBe('Mom');
     expect(res.extractedCriteria.city).toBe('Negombo');
     expect(res.widgetData.relationship).toBe('mother');
   });
@@ -57,7 +57,7 @@ describe('localFallbackParse intent parsing', () => {
     const res = localFallbackParse('මට මගේ තාත්තට චොකලට් එකක් ඕන.');
     expect(res.detectedIntent).toBe('search');
     expect(res.detectedCategory).toBe('Chocolates');
-    expect(res.extractedCriteria.recipient).toBe('Father');
+    expect(res.extractedCriteria.recipient).toBe('Dad');
     expect(res.conversationalReply).toContain('තාත්තා');
     expect(res.conversationalReply).toContain('චොකලට්');
   });
@@ -66,7 +66,7 @@ describe('localFallbackParse intent parsing', () => {
     const res = localFallbackParse('send a cake to my ammata in Galle');
     expect(res.detectedIntent).toBe('search');
     expect(res.detectedCategory).toBe('cakes');
-    expect(res.extractedCriteria.recipient).toBe('Mother');
+    expect(res.extractedCriteria.recipient).toBe('Mom');
     expect(res.extractedCriteria.city).toBe('Galle');
   });
 
@@ -76,6 +76,20 @@ describe('localFallbackParse intent parsing', () => {
     expect(res.extractedCriteria.city).toBe('Negombo');
     expect(res.conversationalReply).toContain('මීගමුව');
     expect(res.conversationalReply).toContain('බෙදා හැරීමේ ගාස්තු');
+  });
+
+  it('correctly parses girlfriend/boyfirend with typos and resolves to Lover', () => {
+    const res = localFallbackParse('i forgot my girlfirends birthday and i want flowers');
+    expect(res.extractedCriteria.recipient).toBe('Lover');
+    expect(res.widgetData.relationship).toBe('lover');
+    expect(res.conversationalReply).toContain("Don't panic"); // empathetic persona
+  });
+
+  it('correctly parses Tanglish recommend query for friend cake to Colombo', () => {
+    const res = localFallbackParse('mge yaluwata upandinayakata chocolate cake ekak yawanna colombo walata');
+    expect(res.detectedIntent).toBe('recommend');
+    expect(res.extractedCriteria.recipient).toBe('Friend');
+    expect(res.extractedCriteria.city).toBe('Colombo');
   });
 
   it('extractCustomMemories returns null when no anecdote is present, even with name/nickname and shopping details', () => {
@@ -136,6 +150,32 @@ describe('localFallbackParse intent parsing', () => {
       const res = localFallbackParse('recommend a cake for Galle next Sunday', false, baseDate);
       expect(res.extractedCriteria.date).toBe('2026-07-05');
       expect(res.widgetData.date).toBe('2026-07-05');
+    });
+  });
+
+  describe('bereavement and condolences logic', () => {
+    it('correctly maps bereavement query in English to flowers category and respectful reply', () => {
+      const res = localFallbackParse('i just lost my dad and i m feeling sad.');
+      expect(res.detectedCategory).toBe('flowers');
+      expect(res.extractedCriteria.giftType).toBe('Flowers');
+      expect(res.extractedCriteria.recipient).toBe('Dad');
+      expect(res.conversationalReply).toContain('sorry for your loss');
+      expect(res.conversationalReply).not.toContain('cake');
+    });
+
+    it('correctly maps bereavement query in Sinhala to flowers category and respectful reply', () => {
+      const res = localFallbackParse('මගේ අම්මා මියගියා මල් බූකේ එකක් ඕන');
+      expect(res.detectedCategory).toBe('flowers');
+      expect(res.extractedCriteria.giftType).toBe('Flowers');
+      expect(res.extractedCriteria.recipient).toBe('Mom');
+      expect(res.conversationalReply).toContain('වියෝව පිළිබඳව මගේ බලවත් කණගාටුව');
+    });
+
+    it('correctly maps bereavement query in Tanglish to flowers category and respectful reply', () => {
+      const res = localFallbackParse('mage yaluwage thaththa නැතිවුණා malthiyenawada');
+      expect(res.detectedCategory).toBe('flowers');
+      expect(res.extractedCriteria.giftType).toBe('Flowers');
+      expect(res.conversationalReply).toContain('වියෝව පිළිබඳව මගේ බලවත් කණගාටුව');
     });
   });
 });

@@ -534,7 +534,7 @@ export async function searchProducts(q: string, category?: string, limit = 5): P
     const detailPromises = ids.map(id => getProduct(id).catch(() => null));
     const details = await Promise.all(detailPromises);
     
-    const results = details.filter((p: KaprukaProduct | null): p is KaprukaProduct => p !== null);
+    const results = details.filter((p: KaprukaProduct | null): p is KaprukaProduct => p !== null && p.name !== 'Unknown Product' && p.price > 0);
     if (results.length === 0) {
       return fallbackSearchProducts(q, category, limit);
     }
