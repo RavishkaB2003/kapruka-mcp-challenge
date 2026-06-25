@@ -684,7 +684,7 @@ export async function checkDelivery(city: string, date: string, productId?: stri
 
     const text = rawResult.content?.[0]?.text || '';
     const deliverable = !text.includes('not deliverable') && !text.includes('Cannot deliver');
-    const rateMatch = text.match(/(?:LKR|Rate|Cost):\s*([0-9,]+)/i) || text.match(/([0-9,]+)\s*LKR/i);
+    const rateMatch = text.match(/(?:LKR|Rate|Cost)\s*:?\s*([0-9,]+)/i) || text.match(/([0-9,]+)\s*LKR/i);
     const rate = rateMatch ? parseFloat(rateMatch[1].replace(/,/g, '')) : 350;
 
     return {

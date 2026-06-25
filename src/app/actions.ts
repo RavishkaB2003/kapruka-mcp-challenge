@@ -220,13 +220,27 @@ export async function trackOrder(orderNumber: string, verificationPhone?: string
     };
   }
 }
-
 const aiClient = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || ''
 });
 
-export async function processChatMessage(messageText: string, isSinhala: boolean = false) {
-  const fallback = localFallbackParse(messageText, isSinhala);
+export async function processChatMessage(messageText: string, isSinhala: boolean = false, clientDate?: string) {
+  // Use client date or fallback to server time in Colombo timezone
+  let currentDate = clientDate;
+  if (!currentDate) {
+    const colomboTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Colombo" });
+    const colomboDate = new Date(colomboTime);
+    const year = colomboDate.getFullYear();
+    const month = String(colomboDate.getMonth() + 1).padStart(2, '0');
+    const day = String(colomboDate.getDate()).padStart(2, '0');
+    currentDate = `${year}-${month}-${day}`;
+  }
+
+  // Format current date and day of week for prompt
+  const dateObj = new Date(currentDate + "T12:00:00");
+  const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+
+  const fallback = localFallbackParse(messageText, isSinhala, currentDate);
   if (!process.env.GEMINI_API_KEY) {
     console.warn('[Gemini] GEMINI_API_KEY not set, using local fallback parser.');
     return fallback;
@@ -239,6 +253,8 @@ export async function processChatMessage(messageText: string, isSinhala: boolean
       config: {
         responseMimeType: 'application/json',
         systemInstruction: `You are the Kapruka Gifting Concierge AI. You help users discover gifts, check delivery rates, query product details, recommend products based on occasions, write personalized gift note messages, and add items directly to their carts.
+
+Current Date Reference: ${currentDate} (${dayOfWeek}). Use this date as your reference point for "today". When the user specifies relative dates like "next Sunday", "tomorrow", "this Friday", "next week", etc., resolve them to the correct YYYY-MM-DD date based on this reference.
 
 Interpret the user message and return a JSON object adhering strictly to the following schema:
 {

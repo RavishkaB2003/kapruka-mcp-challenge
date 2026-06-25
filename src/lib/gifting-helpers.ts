@@ -219,14 +219,98 @@ export const generateGreetings = (
 };
 
 /**
+ * Parses relative date expressions (e.g. "tomorrow", "today", "Sunday", "next Sunday") 
+ * into YYYY-MM-DD format based on a base reference date.
+ */
+export function parseRelativeDate(query: string, currentDateStr?: string): string | null {
+  const q = query.toLowerCase();
+  
+  let baseDate = new Date();
+  if (currentDateStr) {
+    try {
+      const parsed = new Date(currentDateStr + "T12:00:00");
+      if (!isNaN(parsed.getTime())) {
+        baseDate = parsed;
+      }
+    } catch (e) {
+      // Ignore and use current Date
+    }
+  }
+
+  const format = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // 1. Check "tomorrow" / "heeta" (Sinhala for tomorrow) / "heta"
+  if (q.includes('tomorrow') || q.includes('heta') || q.includes('හේට') || q.includes('හෙට')) {
+    const tomorrow = new Date(baseDate);
+    tomorrow.setDate(baseDate.getDate() + 1);
+    return format(tomorrow);
+  }
+
+  // 2. Check "today" / "ada" (Sinhala for today) / "අද"
+  if (q.includes('today') || q.includes('ada') || q.includes('අද')) {
+    return format(baseDate);
+  }
+
+  // 3. Days of the week
+  const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const sinhalaDays = {
+    'sunday': ['irida', 'ඉරිදා'],
+    'monday': ['sanduda', 'සඳුදා'],
+    'tuesday': ['angaharuwada', 'අඟහරුවාදා'],
+    'wednesday': ['badaada', 'බදාදා'],
+    'thursday': ['brahaspathinda', 'බ්‍රහස්පතින්දා'],
+    'friday': ['sikurada', 'සිකුරාදා'],
+    'saturday': ['senasurada', 'සෙනසුරාදා']
+  };
+
+  const currentDayIndex = baseDate.getDay();
+
+  for (let i = 0; i < 7; i++) {
+    const dayName = daysOfWeek[i];
+    const sinhalaPatterns = sinhalaDays[dayName as keyof typeof sinhalaDays];
+    
+    const matchesDay = q.includes(dayName) || sinhalaPatterns.some(p => q.includes(p));
+    
+    if (matchesDay) {
+      const targetDayIndex = i;
+      
+      const isNext = q.includes(`next ${dayName}`) || q.includes(`next  ${dayName}`) || 
+                     sinhalaPatterns.some(p => q.includes(`labana ${p}`) || q.includes(`ලබන ${p}`));
+      
+      let diff = targetDayIndex - currentDayIndex;
+      if (diff <= 0) {
+        diff += 7;
+      }
+
+      let daysToAdd = diff;
+      if (isNext) {
+        daysToAdd += 7;
+      }
+
+      const targetDate = new Date(baseDate);
+      targetDate.setDate(baseDate.getDate() + daysToAdd);
+      return format(targetDate);
+    }
+  }
+
+  return null;
+}
+
+/**
  * Parses user input locally as a fallback when the main AI LLM is unavailable or offline.
  * Extracts intent, category, search term, recipient details, and occasion parameters.
  * 
  * @param query The raw user message string.
  * @param isSinhalaMode Flag indicating if the interface is in Sinhala mode.
+ * @param currentDate Optional local YYYY-MM-DD date string for reference.
  * @returns The structured intent extraction result.
  */
-export function localFallbackParse(query: string, isSinhalaMode: boolean = false): {
+export function localFallbackParse(query: string, isSinhalaMode: boolean = false, currentDate?: string): {
   detectedIntent: 'search' | 'check_delivery' | 'track_order' | 'get_product_info' | 'general' | 'add_to_cart' | 'recommend' | 'compose_greeting';
   detectedIntents: ('search' | 'check_delivery' | 'track_order' | 'get_product_info' | 'general' | 'add_to_cart' | 'recommend' | 'compose_greeting')[];
   detectedCategory: string;
@@ -390,6 +474,8 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     const year = dateMatch[3] || '2026';
     const monthMap: Record<string, string> = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
     date = `${year}-${monthMap[monthStr]}-${day.padStart(2, '0')}`;
+  } else {
+    date = parseRelativeDate(query, currentDate);
   }
 
   // Recipient details extraction for prefill

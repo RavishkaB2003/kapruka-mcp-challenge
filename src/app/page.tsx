@@ -992,8 +992,12 @@ export default function Home() {
         });
 
       } else {
+        // Formulate client current date (YYYY-MM-DD) based on local timezone
+        const localDate = new Date();
+        const clientDateStr = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
+
         // 1. Process chat message using Gemini to extract intent & criteria
-        const result = await processChatMessage(userText, activeLang === 'si');
+        const result = await processChatMessage(userText, activeLang === 'si', clientDateStr);
         const { detectedIntent, detectedIntents, detectedCategory, cleanSearchTerm, requiresClarification, clarificationPrompt, extractedCriteria, widgetData, conversationalReply } = result;
 
         // Sync active category if found

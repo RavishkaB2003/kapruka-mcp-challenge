@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createOrder, getDeliveryCities } from '@/app/actions';
+import { createOrder, getDeliveryCities, checkDelivery } from '@/app/actions';
 import { 
   User, MapPin, Gift, Phone, Mail, ArrowLeft, 
   CreditCard, Loader2, AlertCircle, ShieldAlert 
@@ -93,6 +93,30 @@ export default function CheckoutForm({
   const [cityQuery, setCityQuery] = useState(initialCity || 'Colombo');
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   const [isSearchingCities, setIsSearchingCities] = useState(false);
+  const [customDeliveryFee, setCustomDeliveryFee] = useState<number | null>(null);
+  const [isCheckingFee, setIsCheckingFee] = useState(false);
+
+  const updateDeliveryFee = async (city: string, date: string) => {
+    if (!city || !date || cartItems.length === 0) return;
+    setIsCheckingFee(true);
+    try {
+      const promises = cartItems.map(item => checkDelivery(city, date, item.product.id));
+      const results = await Promise.all(promises);
+      const newFee = Math.max(...results.map(r => r.rate || 350));
+      setCustomDeliveryFee(newFee);
+    } catch (err) {
+      console.error('Error updating delivery fee:', err);
+      setCustomDeliveryFee(350);
+    } finally {
+      setIsCheckingFee(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (deliveryCity && deliveryCity.trim().length >= 3 && deliveryDate) {
+      updateDeliveryFee(deliveryCity.trim(), deliveryDate);
+    }
+  }, [deliveryCity, deliveryDate]);
 
   // Wrapping Details
   const [premiumWrap, setPremiumWrap] = useState(false);
@@ -131,9 +155,11 @@ export default function CheckoutForm({
     return acc + (unitPrice * item.quantity);
   }, 0);
 
-  const deliveryFee = cartItems.length > 0
+  const baseDeliveryFee = cartItems.length > 0
     ? Math.max(...cartItems.map(item => item.customization?.deliveryFee || 0))
     : 0;
+
+  const deliveryFee = customDeliveryFee !== null ? customDeliveryFee : baseDeliveryFee;
 
   const isFreeShipping = itemsSubtotal >= 8000;
   const wrappingCost = premiumWrap ? 350 : 0;
@@ -560,7 +586,11 @@ export default function CheckoutForm({
           <div className="flex justify-between text-xs text-slate-black/50 font-light">
             <span>Fulfillment Shipping ({deliveryCity})</span>
             <span className="font-mono">
-              {isFreeShipping ? (
+              {isCheckingFee ? (
+                <span className="flex items-center gap-1 text-[10px] text-slate-black/40">
+                  <Loader2 className="h-3 w-3 animate-spin text-terracotta" /> Recalculating...
+                </span>
+              ) : isFreeShipping ? (
                 <span className="text-green-600 font-semibold uppercase tracking-wider text-[10px]">Free</span>
               ) : (
                 `LKR ${deliveryFee.toLocaleString()}`

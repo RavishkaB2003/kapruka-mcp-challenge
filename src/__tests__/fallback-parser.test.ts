@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { localFallbackParse, extractCustomMemories } from '../lib/gifting-helpers';
+import { localFallbackParse, extractCustomMemories, parseRelativeDate } from '../lib/gifting-helpers';
 
 describe('localFallbackParse intent parsing', () => {
   it('correctly maps compose_greeting intent patterns', () => {
@@ -95,5 +95,47 @@ describe('localFallbackParse intent parsing', () => {
     const res = localFallbackParse(query);
     expect(res.widgetData.recipientName).toBe('Hasiya');
     expect(res.widgetData.customMemory).toBeNull(); // name/nickname details should not leak into customMemory
+  });
+
+  describe('parseRelativeDate and localFallbackParse date resolution', () => {
+    const baseDate = '2026-06-25'; // Thursday
+
+    it('resolves tomorrow correctly', () => {
+      const date = parseRelativeDate('check delivery for tomorrow', baseDate);
+      expect(date).toBe('2026-06-26');
+    });
+
+    it('resolves today correctly', () => {
+      const date = parseRelativeDate('check delivery for today', baseDate);
+      expect(date).toBe('2026-06-25');
+    });
+
+    it('resolves upcoming Sunday correctly', () => {
+      // 2026-06-25 is Thursday. Sunday of the same week is 2026-06-28.
+      const date = parseRelativeDate('check delivery for Sunday', baseDate);
+      expect(date).toBe('2026-06-28');
+    });
+
+    it('resolves next Sunday correctly', () => {
+      // "next Sunday" is Sunday of the following week: 2026-07-05.
+      const date = parseRelativeDate('check delivery for next Sunday', baseDate);
+      expect(date).toBe('2026-07-05');
+    });
+
+    it('resolves Sinhala tomorrow (heta) correctly', () => {
+      const date = parseRelativeDate('heta delivery puluwanda', baseDate);
+      expect(date).toBe('2026-06-26');
+    });
+
+    it('resolves Sinhala next Sunday (labana irida) correctly', () => {
+      const date = parseRelativeDate('labana irida cake ekak ganna puluwanda', baseDate);
+      expect(date).toBe('2026-07-05');
+    });
+
+    it('localFallbackParse integrates relative date resolution', () => {
+      const res = localFallbackParse('recommend a cake for Galle next Sunday', false, baseDate);
+      expect(res.extractedCriteria.date).toBe('2026-07-05');
+      expect(res.widgetData.date).toBe('2026-07-05');
+    });
   });
 });
