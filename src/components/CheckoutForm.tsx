@@ -73,6 +73,21 @@ export default function CheckoutForm({
       if (prefilledRecipient.address) setDeliveryAddress(prefilledRecipient.address);
     }
   }, [prefilledRecipient]);
+
+  // Synchronize initialCity when search criteria updates in the parent
+  React.useEffect(() => {
+    if (initialCity) {
+      setDeliveryCity(initialCity);
+      setCityQuery(initialCity);
+    }
+  }, [initialCity]);
+
+  // Synchronize initialDate when search criteria updates in the parent
+  React.useEffect(() => {
+    if (initialDate) {
+      setDeliveryDate(initialDate);
+    }
+  }, [initialDate]);
   
   // City search autocomplete
   const [cityQuery, setCityQuery] = useState(initialCity || 'Colombo');
