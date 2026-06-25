@@ -1004,7 +1004,7 @@ export default function Home() {
         // Sync prefilled recipient details if extracted from chat
         if (widgetData) {
           setPrefilledRecipient((prev) => ({
-            name: widgetData.recipientDetails?.name || widgetData.recipientName || prev?.name || null,
+            name: widgetData.recipientDetails?.name || prev?.name || null,
             address: widgetData.recipientDetails?.address || prev?.address || null,
             phone: widgetData.recipientDetails?.phone || prev?.phone || null
           }));
