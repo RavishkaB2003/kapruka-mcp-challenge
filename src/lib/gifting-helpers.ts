@@ -429,10 +429,12 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   }
 
   // 3. Recipient details / explicit name label
-  if (!extractedName) {
-    const detailsM = query.match(/(?:recipient details:|name:)\s+([a-z]+(?:\s+[a-z]+)?)/i);
-    if (detailsM) {
-      extractedName = detailsM[1].trim();
+  let extractedDeliveryName: string | null = null;
+  const detailsM = query.match(/(?:recipient details:|name:)\s+([a-z]+(?:\s+[a-z]+)?)/i);
+  if (detailsM) {
+    extractedDeliveryName = detailsM[1].trim();
+    if (!extractedName) {
+      extractedName = extractedDeliveryName;
     }
   }
 
@@ -450,8 +452,8 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     }
   }
 
-  const recipientDetails = (extractedName || extractedAddress || extractedPhone) ? {
-    name: extractedName,
+  const recipientDetails = (extractedDeliveryName || extractedAddress || extractedPhone) ? {
+    name: extractedDeliveryName,
     address: extractedAddress,
     phone: extractedPhone
   } : null;

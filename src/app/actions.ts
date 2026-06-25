@@ -263,7 +263,7 @@ Interpret the user message and return a JSON object adhering strictly to the fol
     "productName": "extracted product name/description if add_to_cart intent",
     "quantity": number if mentioned, otherwise null,
     "recipientDetails": {
-      "name": "extracted recipient name if mentioned",
+      "name": "recipient's formal delivery name if explicitly provided for delivery/checkout (e.g. in 'delivery details' or 'deliver to John'). Set to null if the name is only mentioned for greeting card personalization.",
       "address": "extracted recipient delivery address if mentioned",
       "phone": "extracted recipient phone number if mentioned"
     },
