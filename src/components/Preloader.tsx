@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
-import createGlobe from 'cobe';
 import { DISTRICTS } from '@/lib/districts';
 
 /**
@@ -14,14 +13,6 @@ interface PreloaderProps {
   onReveal?: () => void;
 }
 
-// Sri Lanka Coordinates
-const TARGET_LAT = 7.8731;
-const TARGET_LON = 80.7718;
-
-// Convert to Cobe spherical coordinates
-const TARGET_THETA = (TARGET_LAT * Math.PI) / 180; // Colatitude (tilt) ~0.1374
-const TARGET_PHI = Math.PI * 2 - (TARGET_LON * Math.PI) / 180; // Azimuthal (rotation) ~4.8738
-
 export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
   const [progress, setProgress] = useState(0);
 
@@ -29,8 +20,6 @@ export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
   const preloaderRef = useRef<HTMLDivElement>(null);
   const leftCurtainRef = useRef<HTMLDivElement>(null);
   const rightCurtainRef = useRef<HTMLDivElement>(null);
-  const canvasWrapperRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const svgWrapperRef = useRef<HTMLDivElement>(null);
   const nodeLinesGroupRef = useRef<SVGGElement>(null);
   const cityNodesRef = useRef<SVGGElement>(null);
@@ -48,10 +37,6 @@ export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
   });
 
   useEffect(() => {
-    let globeInstance: ReturnType<typeof createGlobe> | null = null;
-    let currentPhi = 0;
-    let currentTheta = 0.3;
-    let isTransitioning = false;
     let completed = false;
 
     const safeComplete = () => {
@@ -69,7 +54,6 @@ export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
     // --- 1. SETUP INITIAL STYLES ---
     gsap.set([leftCurtainRef.current, rightCurtainRef.current], { xPercent: 0 });
     gsap.set(svgWrapperRef.current, { opacity: 0.9 });
-    gsap.set(canvasWrapperRef.current, { opacity: 1, scale: 1 });
     
     // Set SVG path bounds for all district paths
     const districtPaths = svgWrapperRef.current?.querySelectorAll<SVGPathElement>('.district-path');
@@ -110,44 +94,7 @@ export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
 
     gsap.set(subTextRef.current, { opacity: 0, y: 10, letterSpacing: '0.1em' });
 
-    // --- 2. INITIALIZE COBE 3D GLOBE ---
-    if (canvasRef.current) {
-      globeInstance = createGlobe(canvasRef.current, {
-        devicePixelRatio: 2,
-        width: 320 * 2,
-        height: 320 * 2,
-        phi: 0,
-        theta: 0.3,
-        dark: 0,
-        diffuse: 1.2,
-        mapSamples: 12000,
-        mapBrightness: 4.5,
-        baseColor: [0.93, 0.91, 0.88], // Neutral Warm Sand
-        markerColor: [226 / 255, 92 / 255, 61 / 255], // Terracotta Clay
-        glowColor: [0, 0, 0], // Completely disable the glow shader to eliminate the white ring
-        markers: [
-          { location: [TARGET_LAT, TARGET_LON], size: 0.06 } // Sri Lanka Marker
-        ],
-        onRender: (state: { phi: number; theta: number }) => {
-          if (!isTransitioning) {
-            currentPhi += 0.008;
-            state.phi = currentPhi;
-          } else {
-            // Smoothly interpolate camera rotation to lock directly on Sri Lanka
-            const phiDiff = TARGET_PHI - currentPhi;
-            const adjustedPhiDiff = Math.atan2(Math.sin(phiDiff), Math.cos(phiDiff));
-            
-            currentPhi += adjustedPhiDiff * 0.08;
-            currentTheta += (TARGET_THETA - currentTheta) * 0.08;
-
-            state.phi = currentPhi;
-            state.theta = currentTheta;
-          }
-        }
-      } as any);
-    }
-
-    // --- 3. TIMELINE & LOADING SIMULATION ---
+    // --- 2. TIMELINE & LOADING SIMULATION ---
     const progressObj = { value: 0 };
     const loadingDuration = 2.8; // Smooth 2.8s load visual progress
 
@@ -174,18 +121,6 @@ export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
         }
       }
     });
-
-    // At 85% progress, trigger the camera focus transition
-    masterTimeline.add(() => {
-      isTransitioning = true;
-    }, loadingDuration * 0.85);
-
-    // Zoom & Fade WebGL, Morph into SVG Outline
-    masterTimeline.to(canvasWrapperRef.current, {
-      opacity: 0,
-      duration: 0.5,
-      ease: 'power2.out'
-    }, loadingDuration - 0.4);
 
     // Draw SVG District Paths with Stagger (drawn throughout the load progress)
     if (districtPaths && districtPaths.length > 0) {
@@ -240,7 +175,7 @@ export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
     masterTimeline.addLabel('visualComplete');
     masterTimeline.to({}, { duration: 0.4 }); // Hold delay
 
-    // --- 4. EXIT CURTAIN SPLIT REVEAL ---
+    // --- 3. EXIT CURTAIN SPLIT REVEAL ---
     masterTimeline.to([progressBarRef.current?.parentElement, progressTextRef.current], {
       opacity: 0,
       y: -10,
@@ -278,12 +213,9 @@ export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
       duration: 0.3
     }, '-=0.3');
 
-    // Cleanup WebGL on unmount
+    // Cleanup on unmount
     return () => {
       clearTimeout(safetyTimeout);
-      if (globeInstance) {
-        globeInstance.destroy();
-      }
     };
   }, []);
 
@@ -324,8 +256,7 @@ export default function Preloader({ onComplete, onReveal }: PreloaderProps) {
         {/* Visual Layer container */}
         <div className="relative h-[min(380px,85vw)] w-[min(380px,85vw)] flex items-center justify-center">
           
-          {/* Cobe 3D WebGL Canvas Layer - Removed to eliminate the dark sphere border and glow */}
-          <div ref={canvasWrapperRef} className="absolute inset-0 flex items-center justify-center pointer-events-none" />
+
 
           {/* Constellation Sri Lanka SVG Map Layer */}
           <div ref={svgWrapperRef} className="absolute inset-0 flex items-center justify-center text-terracotta pointer-events-none">
