@@ -345,6 +345,10 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   conversationalReply: string;
   greetingOptions: string[] | null;
   isAi: boolean;
+  situation?: 'party' | 'home' | 'get_well' | 'romance' | 'bereavement' | 'general';
+  recommendedProductIds?: string[];
+  fallbackCategories?: string[];
+  fallbackSearchTerms?: string[];
 } {
   const q = query.toLowerCase();
   
@@ -354,6 +358,20 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     'නැතිවුණා', 'මියගියා', 'මරණය', 'අවමංගල්‍ය', 'මළගෙදර', 'නිවන් සුව'
   ];
   const isBereavement = bereavementKeywords.some(keyword => q.includes(keyword));
+
+  // Situation detection
+  let situation: 'party' | 'home' | 'get_well' | 'romance' | 'bereavement' | 'general' = 'general';
+  if (isBereavement) {
+    situation = 'bereavement';
+  } else if (q.includes('party') || q.includes('celebration') || q.includes('event') || q.includes('gathering') || q.includes('පාටිය') || q.includes('උත්සවය') || q.includes('paty') || q.includes('paatiya') || q.includes('සාදය') || q.includes('සැමරුම')) {
+    situation = 'party';
+  } else if (q.includes('home') || q.includes('house') || q.includes('family') || q.includes('gewal') || q.includes('gedara') || q.includes('නිවස') || q.includes('පවුල') || q.includes('gewalata') || q.includes('gedarata') || q.includes('ගෙදර')) {
+    situation = 'home';
+  } else if (q.includes('sick') || q.includes('hospital') || q.includes('ill') || q.includes('not well') || q.includes('saneepa') || q.includes('ලෙඩ') || q.includes('සනීප නැති') || q.includes('sanipe') || q.includes('සනීප') || q.includes('රෝහල')) {
+    situation = 'get_well';
+  } else if (q.includes('love') || q.includes('romantic') || q.includes('valentine') || q.includes('girlfriend') || q.includes('boyfriend') || q.includes('wife') || q.includes('husband') || q.includes('ආදරය') || q.includes('baba') || q.includes('sudoo') || q.includes('love') || q.includes('ආදරවන්ත')) {
+    situation = 'romance';
+  }
 
   // Multiple intent detection for local parser
   const intents: ('search' | 'check_delivery' | 'track_order' | 'get_product_info' | 'general' | 'add_to_cart' | 'recommend' | 'compose_greeting')[] = [];
@@ -365,7 +383,7 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   if (q.includes('add') && (q.includes('cart') || q.includes('basket'))) {
     intents.push('add_to_cart');
   }
-  if (isBereavement || q.includes('recommend') || q.includes('suggest') || q.includes('gift idea') || q.includes('birthday') || q.includes('anniversary') || q.includes('occasion') ||
+  if (situation !== 'general' || q.includes('recommend') || q.includes('suggest') || q.includes('gift idea') || q.includes('birthday') || q.includes('anniversary') || q.includes('occasion') ||
       q.includes('upandinay') || q.includes('upadinay') || q.includes('උපන්දිනය') || q.includes('updandina') || q.includes('සංවත්සරය') || q.includes('anniversariya') ||
       q.includes('yawanna') || q.includes('yavanna') || q.includes('yawata') || q.includes('තෑග්ගක්') || q.includes('තෑගි') || q.includes('තෝර') || q.includes('thor')) {
     intents.push('recommend');
@@ -399,32 +417,84 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   let detectedCategory = 'all';
   let cleanSearchTerm = 'gift';
   let giftType = 'Gifts';
+  let recommendedProductIds: string[] = ['MOCK_CAKE_1', 'MOCK_FLOW_1', 'MOCK_CHOC_1'];
+  let fallbackCategories: string[] = ['cakes', 'flowers', 'Chocolates'];
+  let fallbackSearchTerms: string[] = ['cake', 'roses', 'chocolate'];
 
-  // Category mapping
-  if (isBereavement) {
+  // Category and product resolution based on situation
+  if (situation === 'bereavement') {
     detectedCategory = 'flowers';
     cleanSearchTerm = 'sympathy flowers';
     giftType = 'Flowers';
-  } else if (q.includes('cake') || q.includes('කේක්') || q.includes('keik') || q.includes('kake') || q.includes('kek')) {
-    detectedCategory = 'cakes';
-    cleanSearchTerm = 'cake';
-    giftType = 'Cakes';
-  } else if (q.includes('flower') || q.includes('මල්') || q.includes('mal') || q.includes('rose') || q.includes('roja') || q.includes('mal-wattiya')) {
-    detectedCategory = 'flowers';
-    cleanSearchTerm = 'flower bouquet';
-    giftType = 'Flowers';
-  } else if (q.includes('chocolate') || q.includes('චොකලට්') || q.includes('චොක්ලට්') || q.includes('choc') || q.includes('chocalate') || q.includes('choclet')) {
-    detectedCategory = 'Chocolates';
-    cleanSearchTerm = 'chocolate';
-    giftType = 'Chocolates';
-  } else if (q.includes('grocer') || q.includes('එළවළු') || q.includes('කෑම') || q.includes('fruit') || q.includes('vege') || q.includes('elavalu') || q.includes('palathuru') || q.includes('basket')) {
-    detectedCategory = 'Grocery';
-    cleanSearchTerm = 'fruit basket';
-    giftType = 'Grocery';
-  } else if (q.includes('gift') || q.includes('තෑගි') || q.includes('තෑග්ග') || q.includes('toy') || q.includes('teddy') || q.includes('perfume') || q.includes('thagi') || q.includes('සෙල්ලම් බඩු') || q.includes('ටෙඩි')) {
-    detectedCategory = 'uniquegifts';
-    cleanSearchTerm = 'gift';
+    recommendedProductIds = ['MOCK_FLOW_2', 'MOCK_GROC_1'];
+    fallbackCategories = ['flowers', 'Grocery'];
+    fallbackSearchTerms = ['sympathy flowers', 'fruit basket'];
+  } else if (situation === 'party') {
+    detectedCategory = 'all';
+    cleanSearchTerm = 'party gifts';
     giftType = 'Gifts';
+    recommendedProductIds = ['MOCK_CAKE_1', 'MOCK_CHOC_1', 'MOCK_GIFT_2'];
+    fallbackCategories = ['cakes', 'Chocolates'];
+    fallbackSearchTerms = ['cake', 'chocolate'];
+  } else if (situation === 'home') {
+    detectedCategory = 'all';
+    cleanSearchTerm = 'household gifts';
+    giftType = 'Gifts';
+    recommendedProductIds = ['MOCK_GROC_1', 'MOCK_FLOW_2'];
+    fallbackCategories = ['Grocery', 'uniquegifts'];
+    fallbackSearchTerms = ['fruit basket', 'gift'];
+  } else if (situation === 'get_well') {
+    detectedCategory = 'all';
+    cleanSearchTerm = 'get well gifts';
+    giftType = 'Gifts';
+    recommendedProductIds = ['MOCK_GROC_1', 'MOCK_FLOW_3'];
+    fallbackCategories = ['Grocery', 'flowers'];
+    fallbackSearchTerms = ['fruit basket', 'flowers'];
+  } else if (situation === 'romance') {
+    detectedCategory = 'all';
+    cleanSearchTerm = 'romantic gifts';
+    giftType = 'Gifts';
+    recommendedProductIds = ['MOCK_FLOW_1', 'MOCK_CHOC_1', 'MOCK_CAKE_1'];
+    fallbackCategories = ['flowers', 'Chocolates', 'cakes'];
+    fallbackSearchTerms = ['roses', 'chocolate', 'cake'];
+  } else {
+    // Normal Category mapping
+    if (q.includes('cake') || q.includes('කේක්') || q.includes('keik') || q.includes('kake') || q.includes('kek')) {
+      detectedCategory = 'cakes';
+      cleanSearchTerm = 'cake';
+      giftType = 'Cakes';
+      recommendedProductIds = ['MOCK_CAKE_1', 'MOCK_CAKE_2', 'MOCK_CAKE_3'];
+      fallbackCategories = ['cakes'];
+      fallbackSearchTerms = ['cake'];
+    } else if (q.includes('flower') || q.includes('මල්') || q.includes('mal') || q.includes('rose') || q.includes('roja') || q.includes('mal-wattiya')) {
+      detectedCategory = 'flowers';
+      cleanSearchTerm = 'flower bouquet';
+      giftType = 'Flowers';
+      recommendedProductIds = ['MOCK_FLOW_1', 'MOCK_FLOW_2', 'MOCK_FLOW_3'];
+      fallbackCategories = ['flowers'];
+      fallbackSearchTerms = ['flower bouquet'];
+    } else if (q.includes('chocolate') || q.includes('චොකලට්') || q.includes('චොක්ලට්') || q.includes('choc') || q.includes('chocalate') || q.includes('choclet')) {
+      detectedCategory = 'Chocolates';
+      cleanSearchTerm = 'chocolate';
+      giftType = 'Chocolates';
+      recommendedProductIds = ['MOCK_CHOC_1', 'MOCK_CHOC_2', 'MOCK_CHOC_3'];
+      fallbackCategories = ['Chocolates'];
+      fallbackSearchTerms = ['chocolate'];
+    } else if (q.includes('grocer') || q.includes('එළවළු') || q.includes('කෑම') || q.includes('fruit') || q.includes('vege') || q.includes('elavalu') || q.includes('palathuru') || q.includes('basket')) {
+      detectedCategory = 'Grocery';
+      cleanSearchTerm = 'fruit basket';
+      giftType = 'Grocery';
+      recommendedProductIds = ['MOCK_GROC_1', 'MOCK_GROC_2'];
+      fallbackCategories = ['Grocery'];
+      fallbackSearchTerms = ['fruit basket'];
+    } else if (q.includes('gift') || q.includes('තෑගි') || q.includes('තෑග්ග') || q.includes('toy') || q.includes('teddy') || q.includes('perfume') || q.includes('thagi') || q.includes('සෙල්ලම් බඩු') || q.includes('ටෙඩි')) {
+      detectedCategory = 'uniquegifts';
+      cleanSearchTerm = 'gift';
+      giftType = 'Gifts';
+      recommendedProductIds = ['MOCK_GIFT_1', 'MOCK_GIFT_2'];
+      fallbackCategories = ['uniquegifts'];
+      fallbackSearchTerms = ['gift'];
+    }
   }
 
   // Basic city extraction
@@ -571,7 +641,7 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
   let requiresClarification = false;
   let clarificationPrompt: string | null = null;
 
-  if (detectedIntent === 'recommend' && detectedCategory === 'all') {
+  if (detectedIntent === 'recommend' && detectedCategory === 'all' && situation === 'general') {
     requiresClarification = true;
     clarificationPrompt = isSinhala 
       ? "ඔබ සොයන්නේ කුමන ආකාරයේ නිෂ්පාදනයක්ද? කේක්, මල් බූකේ, චොකලට්, ග්‍රොසරි හෝ තෑගි පැකේජ්?" 
@@ -667,8 +737,16 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
       const isBreakup = q.includes('broke up') || q.includes('sorry') || q.includes('sad') || q.includes('cry') || q.includes('bad') || q.includes('bela') || q.includes('apology') || q.includes('තරහ වෙලා') || q.includes('රණ්ඩු') || q.includes('සමාවෙන්න') || q.includes('break up') || q.includes('breakup');
       const isSick = q.includes('sick') || q.includes('hospital') || q.includes('ill') || q.includes('not well') || q.includes('ලෙඩ') || q.includes('සනීප නැති');
 
-      if (isBereavement) {
+      if (situation === 'bereavement') {
         conversationalReply = `ඔබට සිදු වූ මෙම වියෝව පිළිබඳව මගේ බලවත් කණගාටුව ප්‍රකාශ කර සිටිනවා. 🤍 මෙවැනි දුෂ්කර මොහොතක, ශෝකය ප්‍රකාශ කිරීම සඳහා සුදුසු සුදු මල් බූකේ එකක් හෝ නැවුම් පලතුරු වට්ටියක් යැවීම වඩාත් උචිත වේ. මම ඒ සඳහා සුදුසු තේරීම් කිහිපයක් මෙහි දක්වා ඇත:`;
+      } else if (situation === 'party') {
+        conversationalReply = `සතුටුදායක සාදයකට සහ සැමරුමකට කදිම තේරීමක්! 🥳 සාදයේ ප්‍රීතිය වැඩි කිරීමට අපගේ සැබෑ තොගයෙන් රසවත් කේක් සහ වටිනා චොකලට් වර්ග කිහිපයක් මම මෙහි නිර්දේශ කර ඇත:`;
+      } else if (situation === 'home') {
+        conversationalReply = `නිවසකට හෝ පවුලකට ආදරය සහ උණුසුම බෙදා ගැනීමට කදිම අවස්ථාවක්! 🏡 ඒ සඳහා සුදුසු නැවුම් පලතුරු වට්ටියක් හෝ ආකර්ෂණීය තෑගි එකතුවක් මම මෙහි නිර්දේශ කර ඇත:`;
+      } else if (situation === 'get_well') {
+        conversationalReply = `ඔවුන් ඉක්මනින් සුවපත් වේවා කියා ප්‍රාර්ථනා කරමු! 🥺 ඉක්මන් සුවය පතා යැවීමට සුදුසු නැවුම් පලතුරු වට්ටියක් හෝ ලස්සන මල් කළඹක් මම මෙහි නිර්දේශ කර ඇත:`;
+      } else if (situation === 'romance') {
+        conversationalReply = `ආදරණීය මොහොතක් තවත් ලස්සන කරන්න කදිම අවස්ථාවක්! ❤️ ඒ සඳහා සුදුසු ආදරණීය රතු රෝස මල්, රසවත් චොකලට් සහ කේක් වර්ග කිහිපයක් මම මෙහි නිර්දේශ කර ඇත:`;
       } else if (isForgot) {
         conversationalReply = `අයියෝ! 💔 බය වෙන්න එපා — මම ඔයාට උදව් කරන්නම්! අපි මේක ඉක්මනටම ලස්සනට සූදානම් කරමු. බෙදා හැරිය හැකි හොඳම තෑගි නිර්දේශ කිහිපයක් මෙන්න: 🌸`;
       } else if (isBreakup) {
@@ -699,8 +777,16 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
       const isBreakup = q.includes('broke up') || q.includes('sorry') || q.includes('sad') || q.includes('cry') || q.includes('bad') || q.includes('bela') || q.includes('apology') || q.includes('තරහ වෙලා') || q.includes('රණ්ඩු') || q.includes('සමාවෙන්න') || q.includes('break up') || q.includes('breakup');
       const isSick = q.includes('sick') || q.includes('hospital') || q.includes('ill') || q.includes('not well') || q.includes('ලෙඩ') || q.includes('සනීප නැති');
 
-      if (isBereavement) {
+      if (situation === 'bereavement') {
         conversationalReply = `I am so incredibly sorry for your loss. 🤍 During such a difficult time, sending sympathy flowers (like white lilies) or a comforting fruit basket is a thoughtful way to express condolences. Here are some gentle options to show you care:`;
+      } else if (situation === 'party') {
+        conversationalReply = `A party calls for a sweet celebration! 🥳 I've selected some premium cakes and chocolates from our real store inventory to make your gathering absolutely unforgettable:`;
+      } else if (situation === 'home') {
+        conversationalReply = `Sending warm wishes to a home and family! 🏡 A healthy fresh fruit hamper paired with thoughtful gifts is a beautiful way to brighten any household. Here is a selection:`;
+      } else if (situation === 'get_well') {
+        conversationalReply = `I'm so sorry to hear they are not feeling well. 🥺 Sending some fresh fruits or a cheerful bouquet is a wonderful way to brighten their day. Here are some comforting options:`;
+      } else if (situation === 'romance') {
+        conversationalReply = `A perfect moment to express your love! ❤️ I've selected some romantic red roses, delicious chocolates, and sweet cakes to make their heart melt:`;
       } else if (isForgot) {
         conversationalReply = `Aiyo! 💔 Don't panic — I've got your back! Let's get this sorted out right away. Here are some gorgeous options that can be delivered fresh to save the day: 🌸`;
       } else if (isBreakup) {
@@ -747,7 +833,11 @@ export function localFallbackParse(query: string, isSinhalaMode: boolean = false
     },
     conversationalReply,
     greetingOptions: null,
-    isAi: false
+    isAi: false,
+    situation,
+    recommendedProductIds,
+    fallbackCategories,
+    fallbackSearchTerms
   };
 }
 

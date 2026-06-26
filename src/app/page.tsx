@@ -11,7 +11,7 @@ import ProductCustomizer from '@/components/ProductCustomizer';
 const CartDrawer = dynamic(() => import('@/components/CartDrawer'), { ssr: false });
 const CheckoutForm = dynamic(() => import('@/components/CheckoutForm'), { ssr: false });
 const ConfirmationScreen = dynamic(() => import('@/components/ConfirmationScreen'), { ssr: false });
-import { searchProducts, processChatMessage, checkDelivery, trackOrder } from '@/app/actions';
+import { searchProducts, processChatMessage, checkDelivery, trackOrder, getProduct } from '@/app/actions';
 import { getIngredientsForProduct, getAllergensForProduct, generateGreetings, extractCustomMemories } from '@/lib/gifting-helpers';
 import { KaprukaProduct } from '@/lib/kapruka';
 import { 
@@ -1006,7 +1006,7 @@ export default function Home() {
 
         // 1. Process chat message using Gemini to extract intent & criteria
         const result = await processChatMessage(userText, activeLang === 'si', clientDateStr);
-        const { detectedIntent, detectedIntents, detectedCategory, cleanSearchTerm, requiresClarification, clarificationPrompt, extractedCriteria, widgetData, conversationalReply, greetingOptions, isAi } = result;
+        const { detectedIntent, detectedIntents, detectedCategory, cleanSearchTerm, requiresClarification, clarificationPrompt, extractedCriteria, widgetData, conversationalReply, greetingOptions, isAi, recommendedProductIds } = result;
 
         // Sync active category if found
         if (detectedCategory && detectedCategory !== 'all') {
@@ -1179,8 +1179,22 @@ export default function Home() {
               }
 
             } else if (intent === 'recommend') {
-              const queryCat = detectedCategory === 'all' ? 'cakes' : detectedCategory;
-              const searchResults = await searchProducts(cleanSearchTerm || 'gift', queryCat, 3);
+              let searchResults: KaprukaProduct[] = [];
+              if (recommendedProductIds && recommendedProductIds.length > 0) {
+                try {
+                  const detailPromises = recommendedProductIds.map((id: string) => getProduct(id).catch(() => null));
+                  const details = await Promise.all(detailPromises);
+                  searchResults = details.filter((p): p is KaprukaProduct => p !== null);
+                } catch (e) {
+                  console.error('Failed to resolve recommended product details:', e);
+                }
+              }
+
+              // Fallback to query search if ID resolution returned nothing
+              if (searchResults.length === 0) {
+                const queryCat = detectedCategory === 'all' ? 'cakes' : detectedCategory;
+                searchResults = await searchProducts(cleanSearchTerm || 'gift', queryCat, 3);
+              }
 
               if (searchResults && searchResults.length > 0) {
                 setProducts(searchResults);

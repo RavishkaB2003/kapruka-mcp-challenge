@@ -241,10 +241,83 @@ export async function processChatMessage(messageText: string, isSinhala: boolean
   const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 
   const fallback = localFallbackParse(messageText, isSinhala, currentDate);
+
+  // Fallback real products resolver
+  async function resolveFallbackRealProducts(fb: typeof fallback) {
+    if (fb.detectedIntent === 'recommend' && fb.fallbackCategories && fb.fallbackCategories.length > 0) {
+      try {
+        const searchPromises = fb.fallbackCategories.map((cat, idx) => {
+          const term = fb.fallbackSearchTerms?.[idx] || 'gift';
+          return kapruka.searchProducts(term, cat === 'all' ? undefined : cat, 2).catch(() => [] as kapruka.KaprukaProduct[]);
+        });
+        const resultsArray = await Promise.all(searchPromises);
+        const flatResults = resultsArray.flat().filter(p => p && p.id);
+        if (flatResults.length > 0) {
+          fb.recommendedProductIds = flatResults.map(p => p.id);
+        }
+      } catch (e) {
+        console.error('Failed to retrieve real products for local fallback:', e);
+      }
+    }
+    return fb;
+  }
+
   if (!process.env.GEMINI_API_KEY) {
     console.warn('[Gemini] GEMINI_API_KEY not set, using local fallback parser.');
-    return fallback;
+    return await resolveFallbackRealProducts(fallback);
   }
+
+  // RAG Candidate Generation from Kapruka MCP
+  const qLower = messageText.toLowerCase();
+  let ragCategories: string[] = [];
+  let ragSearchTerms: string[] = [];
+
+  const bereavementKeywords = [
+    'lost', 'passed away', 'death', 'die', 'died', 'funeral', 'condolences', 'grief', 
+    'merila', 'nathi wela', 'nathi-wela', 'nathiwela', 'malagedara', 'mala gedara', 'funeral-ekak', 'funeral ekak', 'awalathawaka',
+    'නැතිවුණා', 'මියගියා', 'මරණය', 'අවමංගල්‍ය', 'මළගෙදර', 'නිවන් සුව'
+  ];
+  const isBereavement = bereavementKeywords.some(keyword => qLower.includes(keyword));
+
+  if (isBereavement) {
+    ragCategories = ['flowers', 'Grocery'];
+    ragSearchTerms = ['sympathy flowers', 'fruit basket'];
+  } else if (qLower.includes('party') || qLower.includes('celebration') || qLower.includes('event') || qLower.includes('gathering') || qLower.includes('පාටිය') || qLower.includes('උත්සවය') || qLower.includes('paty') || qLower.includes('paatiya')) {
+    ragCategories = ['cakes', 'Chocolates'];
+    ragSearchTerms = ['cake', 'chocolate'];
+  } else if (qLower.includes('home') || qLower.includes('house') || qLower.includes('family') || qLower.includes('gewal') || qLower.includes('gedara') || qLower.includes('නිවස') || qLower.includes('පවුල') || qLower.includes('gewalata') || qLower.includes('gedarata')) {
+    ragCategories = ['Grocery', 'uniquegifts'];
+    ragSearchTerms = ['fruit basket', 'gift'];
+  } else if (qLower.includes('sick') || qLower.includes('hospital') || qLower.includes('ill') || qLower.includes('not well') || qLower.includes('saneepa') || qLower.includes('ලෙඩ') || qLower.includes('සනීප නැති') || qLower.includes('sanipe')) {
+    ragCategories = ['Grocery', 'flowers'];
+    ragSearchTerms = ['fruit basket', 'flowers'];
+  } else if (qLower.includes('love') || qLower.includes('romantic') || qLower.includes('valentine') || qLower.includes('girlfriend') || qLower.includes('boyfriend') || qLower.includes('wife') || qLower.includes('husband') || qLower.includes('ආදරය') || qLower.includes('baba') || qLower.includes('sudoo') || qLower.includes('love')) {
+    ragCategories = ['flowers', 'Chocolates', 'cakes'];
+    ragSearchTerms = ['roses', 'chocolate', 'cake'];
+  } else {
+    ragCategories = ['all'];
+    ragSearchTerms = [messageText];
+  }
+
+  let candidates: kapruka.KaprukaProduct[] = [];
+  try {
+    const searchPromises = ragCategories.map((cat, idx) => {
+      const term = ragSearchTerms[idx] || 'gift';
+      return kapruka.searchProducts(term, cat === 'all' ? undefined : cat, 3).catch(() => []);
+    });
+    const resultsArray = await Promise.all(searchPromises);
+    candidates = resultsArray.flat().filter(p => p && p.id && p.name);
+  } catch (e) {
+    console.error('[Gemini RAG] Failed to search candidates:', e);
+  }
+
+  if (candidates.length === 0) {
+    candidates = kapruka.MOCK_PRODUCTS;
+  }
+
+  const candidatesText = candidates.map(p => 
+    `ID: "${p.id}" | Name: "${p.name}" | Category: "${p.category}" | Price: LKR ${p.price} | Description: "${p.description || ''}"`
+  ).join('\n');
 
   try {
     const response = await aiClient.models.generateContent({
@@ -270,6 +343,7 @@ Interpret the user message and return a JSON object adhering strictly to the fol
     "city": "Colombo, Galle, Kandy, Negombo, etc. Should be null if not mentioned in the message",
     "date": "YYYY-MM-DD date if mentioned, otherwise null"
   },
+  "recommendedProductIds": ["array of selected product IDs recommended based on user query and context, or empty array"],
   "widgetData": {
     "city": "extracted city name if check_delivery or add_to_cart intent",
     "date": "extracted YYYY-MM-DD date if check_delivery or add_to_cart intent",
@@ -295,7 +369,7 @@ Interpret the user message and return a JSON object adhering strictly to the fol
 
 CRITICAL RULES:
 1. STRICT CATEGORY SEPARATION: Under no circumstances map "chocolate" or "chocolates" to "cakes" or "chocolate cakes" unless the user explicitly mentions "cake", "gateau", or "cupcake". If they say "chocolates" or "Ferrero" or "chocolate box", use category "Chocolates" and cleanSearchTerm "chocolate". Apply this across all other products to prevent miscommunication.
-2. DO NOT GUESS / ASK BACK: If the user input is ambiguous, lacks essential parameters, or you are unsure of the category or product they want, set "requiresClarification" to true, and compose a respectable "clarificationPrompt" asking them to clarify in a polite, professional way. Do not guess. ${isSinhala ? 'The clarificationPrompt must be written in natural Sinhala Unicode.' : 'The clarificationPrompt must be in English.'}
+2. DO NOT GUESS / ASK BACK: If the user input is ambiguous, lacks essential parameters, or you are unsure of the category or product they want, set "requiresClarification" to true, and compose a respectable "clarificationPrompt" asking them to clarify in a polite, professional way. Do not guess. However, queries related to common gifting situations (such as "home", "party", "get well", "romance", "bereavement", e.g., "i want couple of things for home", "going to have a party") are NOT considered ambiguous. For these, you must set "requiresClarification" to false, classify the intent as "recommend", and proactively recommend a selection of relevant products immediately. ${isSinhala ? 'The clarificationPrompt must be written in natural Sinhala Unicode.' : 'The clarificationPrompt must be in English.'}
 3. RECIPIENT DETAILS EXTRACTION: If the user provides a recipient's name, address, or phone number in their message (e.g., "delivery details: John Doe, 12 Galle Road Colombo, 0771234567"), extract them into the "recipientDetails" object so we can pre-populate the checkout form.
 4. GREETING CARD COMPOSITION CLARIFICATION: If the intent is "compose_greeting", check if the relationship/recipient and the occasion are specified. If either is missing, set "requiresClarification" to true, and dynamically compose "clarificationPrompt" asking ONLY for the missing information (e.g., if recipient is known but occasion is missing, ask for the occasion; if occasion is known but recipient is missing, ask for the recipient; if both are missing, ask for both). If both recipient and occasion are already provided, set "requiresClarification" to false and generate the greetings directly without asking for clarification. You may also politely ask the user for any nicknames, inside jokes, or memories to make it intimate, but do not block if both recipient and occasion are known. ${isSinhala ? 'The clarificationPrompt must be written in natural Sinhala Unicode.' : 'The clarificationPrompt must be in English.'}
 5. MULTI-INTENT DETECTION: The user may ask for multiple things at once (e.g. "Recommend a cake and write a greeting card" or "check delivery rates to Galle and recommend flowers"). Detect all requested intents and list them in the "detectedIntents" array. The primary or first intent should also be set as "detectedIntent". Support this across both English and Sinhala inputs.
@@ -310,6 +384,9 @@ CRITICAL RULES:
    - Maps friend, buddy, bestie, yaluwa, yaluwata, මිතුරා, හිතවතා, මචං, firend $\rightarrow$ recipient: "Friend", relationship: "friend".
    - Default to recipient: "Someone Special", relationship: "someone special".
 9. BEREAVEMENT & CONDOLENCES (CRITICAL EMOTION RULE): If the user mentions loss, death, passing away, funerals, or grief (e.g., "lost my dad", "passed away", "funeral", "merila", "nathi wela", "malagedara", "නැතිවුණා", "මියගියා", "මරණය"), you must respond with deep respect, sincere empathy, and comfort. You must ONLY recommend the categories "flowers" (sympathy/condolences flowers) or "Grocery" (fresh fruit baskets/hampers). You must NEVER recommend "cakes" or "Chocolates" under any circumstances for bereavement queries, as they are celebratory. Set "detectedCategory" to "flowers" (or "Grocery") and "extractedCriteria.giftType" to "Flowers" (or "Grocery"). The "conversationalReply" must express respect and condolences in the correct language style (respectful English for English, and premium Sinhala Unicode for Sinhala/Tanglish).
+10. PRODUCT INVENTORY & CONTEXTUAL RECOMMENDATION RULE: We have fetched matching candidate products from our real Kapruka MCP store database based on the user's message context:
+${candidatesText}
+Evaluate the user's specific context (e.g., party, home, love, condolences) and select 1 or more relevant products from the list above. Add their IDs to the "recommendedProductIds" array. If none are suitable, return an empty array. In your "conversationalReply", explain your choices warmly, keeping in mind our Gifting Concierge persona and the correct language style.
 
 CRITICAL SECURITY GUARDRAILS:
 1. Strict Scope Lock: You are strictly a Gifting Concierge. Refuse unrelated topics politely.
@@ -351,13 +428,14 @@ CRITICAL SECURITY GUARDRAILS:
         },
         conversationalReply: parsed.conversationalReply || fallback.conversationalReply,
         greetingOptions: parsed.greetingOptions || null,
-        isAi: true
+        isAi: true,
+        recommendedProductIds: parsed.recommendedProductIds || []
       };
     }
-    return fallback;
+    return await resolveFallbackRealProducts(fallback);
   } catch (error) {
     console.error('[Gemini] Error processing chat message:', error);
-    return fallback;
+    return await resolveFallbackRealProducts(fallback);
   }
 }
 

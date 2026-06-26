@@ -178,4 +178,47 @@ describe('localFallbackParse intent parsing', () => {
       expect(res.conversationalReply).toContain('වියෝව පිළිබඳව මගේ බලවත් කණගාටුව');
     });
   });
+
+  describe('situation detection and fallback recommendations', () => {
+    it('detects party situation and recommends appropriate categories and mock products', () => {
+      const res = localFallbackParse('im going to have a party and i need things');
+      expect(res.situation).toBe('party');
+      expect(res.recommendedProductIds).toContain('MOCK_CAKE_1');
+      expect(res.recommendedProductIds).toContain('MOCK_CHOC_1');
+      expect(res.fallbackCategories).toContain('cakes');
+      expect(res.fallbackCategories).toContain('Chocolates');
+      expect(res.conversationalReply).toContain('party');
+      expect(res.conversationalReply).toContain('cakes and chocolates');
+    });
+
+    it('detects home situation and recommends appropriate categories and mock products in Sinhala', () => {
+      const res = localFallbackParse('මම අලුත් ගෙදරකට තෑග්ගක් යවන්න ඕන');
+      expect(res.situation).toBe('home');
+      expect(res.recommendedProductIds).toContain('MOCK_GROC_1');
+      expect(res.fallbackCategories).toContain('Grocery');
+      expect(res.conversationalReply).toContain('නිවසකට');
+      expect(res.conversationalReply).toContain('පලතුරු');
+    });
+
+    it('detects get_well situation and recommends appropriate categories and mock products in English', () => {
+      const res = localFallbackParse('my friend is in the hospital and i want to send some things');
+      expect(res.situation).toBe('get_well');
+      expect(res.recommendedProductIds).toContain('MOCK_GROC_1');
+      expect(res.recommendedProductIds).toContain('MOCK_FLOW_3');
+      expect(res.fallbackCategories).toContain('Grocery');
+      expect(res.fallbackCategories).toContain('flowers');
+      expect(res.conversationalReply).toContain('feeling well');
+      expect(res.conversationalReply).toContain('fresh fruits');
+    });
+
+    it('detects romance situation and recommends appropriate categories and mock products in Tanglish', () => {
+      const res = localFallbackParse('baba deepu love ekata deepu sweet cake ekak rose bouquet ekak oni');
+      expect(res.situation).toBe('romance');
+      expect(res.recommendedProductIds).toContain('MOCK_FLOW_1');
+      expect(res.recommendedProductIds).toContain('MOCK_CHOC_1');
+      expect(res.fallbackCategories).toContain('flowers');
+      expect(res.fallbackCategories).toContain('Chocolates');
+      expect(res.conversationalReply).toContain('රෝස මල්');
+    });
+  });
 });
