@@ -56,4 +56,30 @@ describe('order tracking verification', () => {
     expect(res3.city).toBe('Kandy');
     expect(res3.status).toBe('prepared');
   });
+
+  it('correctly tracks and verifies the real Kapruka test order VPAY827982BA', async () => {
+    // 1. Calling without phone
+    const res1 = await trackOrder('VPAY827982BA');
+    expect(res1.verified).toBe(false);
+    expect(res1.status).toBe('AWAITING_VERIFICATION');
+
+    // 2. Calling with wrong phone
+    const res2 = await trackOrder('VPAY827982BA', '0777777777');
+    expect(res2.verified).toBe(false);
+    expect(res2.status).toBe('VERIFICATION_FAILED');
+
+    // 3. Calling with correct local phone format
+    const res3 = await trackOrder('VPAY827982BA', '0773517248');
+    expect(res3.verified).toBe(true);
+    expect(res3.city).toBe('POLGASOWITA');
+    expect(res3.status).toBe('delivered');
+    expect(res3.items).toBe('Flower Arrangement');
+
+    // 4. Calling with correct country code format (+94)
+    const res4 = await trackOrder('VPAY827982BA', '+94 77 351 7248');
+    expect(res4.verified).toBe(true);
+    expect(res4.city).toBe('POLGASOWITA');
+    expect(res4.status).toBe('delivered');
+    expect(res4.items).toBe('Flower Arrangement');
+  });
 });

@@ -175,12 +175,12 @@ export async function trackOrder(orderNumber: string, verificationPhone?: string
 
     const rawResult = await kapruka.trackOrder(orderNumber);
     
-    // Normalize and clean phone numbers for matching
-    const cleanedInputPhone = verificationPhone.replace(/\D/g, '');
+    // Normalize and clean phone numbers for matching (using the last 9 digits to be country-code robust)
+    const cleanedInputPhone = verificationPhone.replace(/\D/g, '').slice(-9);
     const cleanedRawResult = rawResult.replace(/\D/g, '');
 
-    // Strict verification
-    const isVerified = cleanedInputPhone.length >= 9 && cleanedRawResult.includes(cleanedInputPhone);
+    // Strict verification (insisting on exactly 9 digits matching)
+    const isVerified = cleanedInputPhone.length === 9 && cleanedRawResult.includes(cleanedInputPhone);
     if (!isVerified) {
       return {
         verified: false,
@@ -200,16 +200,53 @@ export async function trackOrder(orderNumber: string, verificationPhone?: string
       status = 'prepared';
     }
 
-    // Extract city (regex lookup)
-    const cityMatch = rawResult.match(/City:\s*([A-Za-z]+)/i) || rawResult.match(/Galle|Colombo|Kandy|Negombo|Jaffna/i);
-    const city = cityMatch ? (cityMatch[1] || cityMatch[0]) : 'Colombo';
+    // Extract city (dynamic lookup from address or fallback)
+    let city = 'Colombo';
+    const cityMatch = rawResult.match(/City:\s*([A-Za-z]+)/i);
+    if (cityMatch) {
+      city = cityMatch[1];
+    } else {
+      const addressLines = rawResult.split('\n');
+      const deliveringIdx = addressLines.findIndex(l => l.toLowerCase().includes('delivering to'));
+      if (deliveringIdx !== -1 && addressLines[deliveringIdx + 2]) {
+        const addressLine = addressLines[deliveringIdx + 2];
+        const parts = addressLine.split(/[,-]/);
+        if (parts.length > 0) {
+          const lastPart = parts[parts.length - 1].replace(/[*_#\-]/g, '').trim();
+          if (lastPart && !/\d/.test(lastPart) && lastPart.length > 2) {
+            city = lastPart;
+          } else if (parts[parts.length - 2]) {
+            const secondLast = parts[parts.length - 2].replace(/[*_#\-]/g, '').trim();
+            if (secondLast && !/\d/.test(secondLast) && secondLast.length > 2) {
+              city = secondLast;
+            }
+          }
+        }
+      }
+    }
+    city = city.trim();
+
+    // Extract dynamic item description
+    let items = 'Gifting Items';
+    if (textLower.includes('flower arrangement')) {
+      items = 'Flower Arrangement';
+    } else if (textLower.includes('cake')) {
+      items = 'Premium Cake';
+    } else if (textLower.includes('chocolate')) {
+      items = 'Artisanal Chocolates';
+    } else if (textLower.includes('fruit basket') || textLower.includes('hamper')) {
+      items = 'Fruit Basket Hamper';
+    } else if (textLower.includes('grocery')) {
+      items = 'Grocery Basket';
+    }
 
     // Return strict status object (no PII leaked)
     return {
       verified: true,
       orderNumber,
       status,
-      city
+      city,
+      items
     };
   } catch (error) {
     console.error('Action trackOrder error:', error);
